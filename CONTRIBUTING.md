@@ -77,20 +77,32 @@ One thing it does not say, because it is about reviewing rather than writing:
 
 ## Cutting a release
 
-From the trunk, once the change is merged:
+The version bump and the changelog entry go in a **pull request**, like any other change: edit
+`version` in `package.json`, run `npm install --package-lock-only` so the lockfile agrees, and add
+the `CHANGELOG.md` section. `npm version` is the wrong tool here, because it commits to whatever
+branch is checked out, and the trunk takes no commits.
+
+Once that merges, the trunk is already at the release version, so tagging is all that is left:
 
 ```bash
-npm version patch        # minor / major as the change warrants
-git push origin main --follow-tags
+git checkout main && git pull
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
-The tag is the trigger. `.github/workflows/release.yml` re-runs every CI gate, verifies the
-package from its own tarball, publishes to npm with provenance, and opens a GitHub release from
-the `CHANGELOG.md` section matching the tag. It refuses a tag that disagrees with `package.json`,
-and one with no changelog entry.
+Push the tag on its own. `git push origin main --follow-tags` pushes the trunk as well as the tag,
+which is a direct push to the trunk, and the git-safety policy blocks it for exactly that reason.
+Create the tag before pushing it, in a separate command: the policy recognises a tag push by
+resolving the ref, so a tag that does not exist yet when the hook reads the command looks like an
+ordinary branch push.
 
-Write the changelog entry before tagging, and list only what a scaffolded repository receives.
-Changes to CI, contributor tooling or the design record never reach one.
+The tag is the trigger. `.github/workflows/release.yml` runs the same gates ci.yml runs, verifies
+the package from its own tarball, publishes to npm with provenance, and opens a GitHub release
+from the `CHANGELOG.md` section matching the tag. It refuses a tag that disagrees with
+`package.json`, and one with no changelog entry.
+
+List in the changelog only what a scaffolded repository receives. Changes to CI, contributor
+tooling or the design record never reach one.
 
 The emitted review workflow pins the version that scaffolded it, so a release is also what new
 scaffolds will install.

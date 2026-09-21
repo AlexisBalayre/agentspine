@@ -1,0 +1,24 @@
+# The Node half of the gate set, so ci.yml and release.yml cannot drift apart. release.yml
+# claims to run every gate ci.yml runs; before this it made that claim by re-typing them.
+name: node gates
+description: Typecheck, build, test, drift check and package verification.
+
+runs:
+  using: composite
+  steps:
+    - run: npm ci || npm install
+      shell: bash
+    - run: npm run typecheck
+      shell: bash
+    - run: npm run build
+      shell: bash
+    - run: npm test
+      shell: bash
+    # This repository is scaffolded by its own tool: fail if the generator and the
+    # committed tree have drifted apart. Content-compared, so the shared symlinks pass.
+    - run: node dist/cli.js --check --tools claude-code,opencode --packs thinking,engineering,planning,review
+      shell: bash
+    # The suite above runs from source. This one scaffolds from the packed tarball, which is
+    # the only way a file missing from "files" or a lost exec bit shows up before a release.
+    - run: ./scripts/verify-package.sh
+      shell: bash

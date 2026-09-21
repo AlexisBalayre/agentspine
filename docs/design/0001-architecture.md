@@ -594,15 +594,29 @@ keep the private fingerprint list in the tree; a long-lived npm token is a large
 same object. The publish job holds a short-lived credential, and npm attaches provenance tying the
 published tarball to the workflow run that built it.
 
-**The tag push is what decision 22 made possible.** git-safety allows it because a tag publishes a
-ref that points at the trunk rather than moving it. That fix and this workflow are one thought,
-arrived at from opposite ends.
+**The tag push is what the git-safety fix in #22 made possible**, and the release procedure had to
+be written to match what that fix actually permits. The first draft said `npm version patch` and
+`git push origin main --follow-tags`, and both halves were wrong: `npm version` commits to the
+checked-out branch, and the trunk takes no commits; `--follow-tags` pushes the trunk alongside the
+tag, which is a direct push to the trunk and is blocked, correctly, by a second guard the fix never
+touched. The version bump belongs in the release pull request like any other change, leaving the
+trunk with nothing to do but carry the tag. Verified against the policy: `git push origin v0.1.0`
+and `git push origin --tags` pass from the trunk, `git push origin main --follow-tags` is blocked,
+and so is a tag push whose tag does not exist yet — the policy recognises one by resolving the ref,
+so the tag has to be created in its own command first.
 
-Decision 21's header also claimed agentspine "is not published yet" as a reason to build the review
-tooling from the base branch rather than install it. That has been false since 0.1.0. The reason
-that survives is the one that was always doing the work: here the review tooling is the code under
-review, so building the pull request's own `src/` would hand untrusted code a job holding the
-review token.
+**The gate steps live in `.github/actions/`, called by both workflows.** release.yml claims to run
+every gate ci.yml runs, and the first draft made that claim by re-typing them, which is the
+two-copies-must-agree shape this repository already refuses elsewhere. Composite actions rather
+than a reusable workflow, because a reusable workflow renames the checks to `ci / test` and
+`ci / shell`, and main's ruleset requires `test` and `shell`: the fix for a drift risk would have
+quietly made the trunk unmergeable.
+
+The review workflow's header also claimed agentspine "is not published yet" as a reason to build
+the review tooling from the base branch rather than install it. That has been false since 0.1.0.
+The reason that survives is the one that was always doing the work: here the review tooling is the
+code under review, so building the pull request's own `src/` would hand untrusted code a job
+holding the review token.
 
 - **Cost accepted:** a tag push now publishes. A mistyped tag puts a version on the registry that
   cannot be unpublished after 72 hours. The guards catch a tag that disagrees with `package.json`

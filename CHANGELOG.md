@@ -12,7 +12,8 @@ repository means re-running `npx agentspine`.
 
 - The `git-safety` hook policy blocked pushing a release tag from the trunk. A tag push publishes
   a ref that points at the trunk; it does not move the trunk, so the branch-first rule never
-  applied to it. Pushes that carry no tag are still blocked on the trunk.
+  applied to it. A push that carries the trunk as well as the tag, such as `--follow-tags`, is
+  still a direct push to the trunk and is still blocked, as is any push carrying no tag at all.
 
 ## 0.1.0 — 2026-09-18
 

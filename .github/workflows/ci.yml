@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
 
+# The gate steps live in .github/actions/, so release.yml runs the same ones rather than a
+# re-typed copy. Job names are the contract: main's ruleset requires `test` and `shell`.
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,16 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - run: npm ci || npm install
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm test
-      # This repository is scaffolded by its own tool: fail if the generator and the
-      # committed tree have drifted apart. Content-compared, so the shared symlinks pass.
-      - run: node dist/cli.js --check --tools claude-code,opencode --packs thinking,engineering,planning,review
-      # The suite above runs from source. This one scaffolds from the packed tarball, which is
-      # the only way a file missing from "files" or a lost exec bit shows up before a release.
-      - run: ./scripts/verify-package.sh
+      - uses: ./.github/actions/node-gates
 
   shell:
     runs-on: ubuntu-latest
@@ -29,13 +22,6 @@ jobs:
       - uses: actions/checkout@v4
         # audit-authors.sh walks the whole history, not just the pushed range.
         with: { fetch-depth: 0 }
-      # The whole emitted product is shell. This is the cheapest real-bug catcher we have.
-      - run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - run: shellcheck -s bash templates/agents/hooks/policies/*.sh templates/agents/hooks/adapters/*.sh scripts/*.sh templates/agents/scripts/*.sh templates/agents/skills/*/*.sh templates/agents/skills/*/scripts/*.sh
-      # Shipped content lands in strangers' repositories; a leak there is public and permanent.
-      - run: ./scripts/audit-templates.sh
-        env:
-          AUDIT_EXTRA_FINGERPRINTS: ${{ secrets.AUDIT_EXTRA_FINGERPRINTS }}
-      # A commit published under the wrong account can only be undone by rewriting public
-      # history. Catch it before it merges, not after.
-      - run: ./scripts/audit-authors.sh
+      - uses: ./.github/actions/shell-gates
+        with:
+          extra-fingerprints: ${{ secrets.AUDIT_EXTRA_FINGERPRINTS }}

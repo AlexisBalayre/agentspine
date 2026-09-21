@@ -1,15 +1,19 @@
-# Publishes to npm when a `v*` tag is pushed. The tag is the trigger and the only manual step:
+# Publishes to npm when a `v*` tag is pushed. The version is bumped in the pull request, so the
+# tag is the only step taken on the trunk:
 #
-#   npm version patch        # or minor / major -- writes package.json and the tag
-#   git push origin main --follow-tags
+#   git checkout main && git pull
+#   git tag v1.2.3
+#   git push origin v1.2.3
 #
 # Setup (once): configure npm trusted publishing for the package -- npmjs.com -> agentspine ->
-# Settings -> Trusted publisher -> this repository, workflow `release.yml`. No npm token is
-# stored anywhere; the job authenticates with a short-lived OIDC credential instead, and npm
-# attaches provenance linking the published tarball to this workflow run.
+# Settings -> Trusted publisher -> this repository, workflow `release.yml`, `npm publish`
+# allowed, no environment. No npm token is stored anywhere; the job authenticates with a
+# short-lived OIDC credential instead, and npm attaches provenance linking the published tarball
+# to this workflow run.
 #
-# Every gate from ci.yml runs again here. A tag can be pushed at a commit CI never saw, and the
-# release is the last moment the difference is still cheap.
+# The gates below are the same composite actions ci.yml runs, not a copy of them. They run again
+# here because a tag can be pushed at a commit CI never saw, and the release is the last moment
+# that difference is still cheap.
 name: release
 
 on:
@@ -28,9 +32,10 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: "20", registry-url: "https://registry.npmjs.org" }
-      # Trusted publishing needs npm 11.5.1 or newer; Node 20 ships npm 10.
-      - run: npm install -g npm@latest
-      - run: npm ci || npm install
+      # Trusted publishing needs npm 11.5.1 or newer; Node 20 ships npm 10. Pinned to a major,
+      # so the credential exchange is not at the mercy of whatever `latest` resolves to today.
+      - run: npm install -g npm@11
+        shell: bash
 
       # A tag that disagrees with package.json publishes a version nobody can find from the
       # tag, and the changelog then describes a release that does not exist under that name.
@@ -45,20 +50,10 @@ jobs:
           grep -q "^## ${pkg_version//./\\.} " CHANGELOG.md \
             || { echo "CHANGELOG.md has no entry for $pkg_version" >&2; exit 1; }
 
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm test
-      - run: node dist/cli.js --check --tools claude-code,opencode --packs thinking,engineering,planning,review
-
-      - run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - run: shellcheck -s bash templates/agents/hooks/policies/*.sh templates/agents/hooks/adapters/*.sh scripts/*.sh templates/agents/scripts/*.sh templates/agents/skills/*/*.sh templates/agents/skills/*/scripts/*.sh
-      - run: ./scripts/audit-templates.sh
-        env:
-          AUDIT_EXTRA_FINGERPRINTS: ${{ secrets.AUDIT_EXTRA_FINGERPRINTS }}
-      - run: ./scripts/audit-authors.sh
-
-      # The tests run from source. This one runs from the tarball, which is what strangers get.
-      - run: ./scripts/verify-package.sh
+      - uses: ./.github/actions/node-gates
+      - uses: ./.github/actions/shell-gates
+        with:
+          extra-fingerprints: ${{ secrets.AUDIT_EXTRA_FINGERPRINTS }}
 
       - run: npm publish --provenance --access public
 
