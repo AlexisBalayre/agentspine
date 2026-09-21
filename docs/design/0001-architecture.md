@@ -640,19 +640,37 @@ newlines while tracking quotes and backslash escapes, a middle step unwraps `bas
 rule anchors to the start of a command rather than matching anywhere inside one. Rules name a
 subcommand and step over git's global options on the way to it.
 
-Two things this is not. It is not a shell: one level of runner unwrapping, and a line of a
-heredoc that begins with a forbidden command is still read as that command. And it is not applied
-to the `rm -rf /` rule, which still matches the whole line, because the two errors do not cost the
-same. Blocking a command that merely names a force push costs a retry. Missing one that empties
-the disk costs the disk.
+Two things this is not. It is not a shell: one level of runner unwrapping, no nested command
+substitution, a fixed list of wrapper words, and a line of a heredoc that begins with a forbidden
+command is still read as that command. And it is not applied to the `rm -rf /` rule, which still
+matches the whole line, because the two errors do not cost the same. Blocking a command that
+merely names a force push costs a retry. Missing one that empties the disk costs the disk.
+
+**This overturns a decision the hook contract had already recorded.** `CONTRACT.md` named literal
+matching a known limitation and called it deliberate, on the grounds that a parser disagreeing
+with the user's real shell is a bypass rather than an inconvenience. That objection was right on
+the mechanism and wrong on the price. The first version of this parser proved the mechanism: it
+read commands only where the line began with `git`, so `sudo git push origin main`,
+`exec`, `nohup`, `timeout 5`, `command`, `time` and a `bash -c` payload with anything before the
+git call all walked through rules the blunt string match had always caught. Five false blocks
+traded for eight bypasses is not a fix.
+
+So the objection is answered rather than dropped, as a rule the file now has to keep: **the
+parser must never be more permissive than the string match was.** Wrapper words are stepped over,
+a runner's payload is unquoted before it is read, and the body of a command substitution is
+collected and read as commands -- which closes two holes the string match never covered. The
+table of wrapped commands in `test/claude-code-adapter.test.ts` is what holds the file to the
+rule; it was written by running the old policy and the new one against the same list.
 
 The same change fixed a hole nobody had noticed. Rules looked for the subcommand immediately after
 `git`, so `git -C <path> push origin main` matched nothing and pushed the trunk unchallenged. The
 over-match and the under-match were the same bug seen from two sides: a regex over prose standing
 in for knowing what the line runs.
 
-- **Cost accepted:** a hook policy now depends on awk as well as jq. awk is POSIX and was already
-  used by an adapter, but it is a second interpreter in the path of every bash call.
+- **Cost accepted:** a hook policy now depends on awk and sed as well as jq. Both are POSIX, and
+  awk was already used by `quality-gate.sh` -- a policy, not an adapter -- but this puts a second
+  interpreter in the path of every bash call. `CONTRACT.md` and the README now say so, since a
+  machine missing either would lose the hook rather than fail loudly.
 - **Cost accepted:** the splitter is a parser, and parsers have edge cases a regex does not. The
   ones known are written above rather than left to be discovered; the table of cases in
   `test/claude-code-adapter.test.ts` is where a new one gets added.

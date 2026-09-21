@@ -212,3 +212,62 @@ describe("git-safety tells running a command from naming one", () => {
     expect(run(repoOn("main"), "git log --grep=commit").status).toBe(0);
   });
 });
+
+/**
+ * Reading commands instead of text is only an improvement if it never reads *fewer* of them. The
+ * string match this replaced was blunt, but bluntness caught a wrapped command for free: it saw
+ * `sudo git push origin main` because it saw the characters. A parser has to be told. Every case
+ * here is a real invocation of a forbidden command, and the first six regressed when the parser
+ * first landed -- which is what this table exists to stop happening again.
+ */
+describe("git-safety sees a forbidden command however it is wrapped", () => {
+  function repo() {
+    const root = mkdtempSync(path.join(tmpdir(), "agentspine-wrapped-"));
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
+    git("init", "-q", "-b", "main");
+    writeFileSync(path.join(root, "a.txt"), "x\n");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+    git("checkout", "-q", "-b", "feat/x");
+    return root;
+  }
+
+  const run = (command: string) =>
+    spawnSync("bash", [ADAPTER, "git-safety"], {
+      input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd: repo(), tool_input: { command } }),
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: repo() },
+    });
+
+  const PUSH = ["git", "push", "origin", "main"].join(" ");
+
+  it.each([
+    ["sudo", `sudo ${PUSH}`],
+    ["exec", `exec ${PUSH}`],
+    ["nohup", `nohup ${PUSH}`],
+    ["timeout and its duration", `timeout 5 ${PUSH}`],
+    ["command", `command ${PUSH}`],
+    ["time", `time ${PUSH}`],
+    ["an environment assignment", `GIT_TRACE=1 ${PUSH}`],
+  ])("blocks a push to the trunk behind %s", (_label, command) => {
+    expect(run(command).status).toBe(2);
+  });
+
+  it.each([
+    ["a shell runner whose payload starts elsewhere", `bash -c "cd /tmp && ${PUSH}"`],
+    ["a single-quoted runner payload", `sh -c '${PUSH}'`],
+    ["command substitution", `$(${PUSH})`],
+    ["backticks", "`" + PUSH + "`"],
+  ])("blocks a push to the trunk inside %s", (_label, command) => {
+    expect(run(command).status).toBe(2);
+  });
+
+  it("blocks a force push behind a wrapper", () => {
+    expect(run("sudo git push --force origin feat/x").status).toBe(2);
+  });
+
+  it("blocks a hard reset behind a wrapper", () => {
+    expect(run(["sudo", "git", "reset", "--hard", "HEAD~1"].join(" ")).status).toBe(2);
+  });
+});
