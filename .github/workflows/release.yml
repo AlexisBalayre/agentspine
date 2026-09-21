@@ -1,0 +1,79 @@
+# Publishes to npm when a `v*` tag is pushed. The version is bumped in the pull request, so the
+# tag is the only step taken on the trunk:
+#
+#   git checkout main && git pull
+#   git tag v1.2.3
+#   git push origin v1.2.3
+#
+# Setup (once): configure npm trusted publishing for the package -- npmjs.com -> agentspine ->
+# Settings -> Trusted publisher -> this repository, workflow `release.yml`, `npm publish`
+# allowed, no environment. No npm token is stored anywhere; the job authenticates with a
+# short-lived OIDC credential instead, and npm attaches provenance linking the published tarball
+# to this workflow run.
+#
+# The gates below are the same composite actions ci.yml runs, not a copy of them. They run again
+# here because a tag can be pushed at a commit CI never saw, and the release is the last moment
+# that difference is still cheap.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+        # audit-authors.sh walks the whole history, not just the tagged commit.
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", registry-url: "https://registry.npmjs.org" }
+      # Trusted publishing needs npm 11.5.1 or newer; Node 20 ships npm 10. Pinned to a major,
+      # so the credential exchange is not at the mercy of whatever `latest` resolves to today.
+      - run: npm install -g npm@11
+        shell: bash
+
+      # A tag that disagrees with package.json publishes a version nobody can find from the
+      # tag, and the changelog then describes a release that does not exist under that name.
+      - name: The tag must name the version being published
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version=$(node -p "require('./package.json').version")
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json version $pkg_version" >&2
+            exit 1
+          fi
+          grep -q "^## ${pkg_version//./\\.} " CHANGELOG.md \
+            || { echo "CHANGELOG.md has no entry for $pkg_version" >&2; exit 1; }
+
+      - uses: ./.github/actions/node-gates
+      - uses: ./.github/actions/shell-gates
+        with:
+          extra-fingerprints: ${{ secrets.AUDIT_EXTRA_FINGERPRINTS }}
+
+      - run: npm publish --provenance --access public
+
+  announce:
+    # Separate job so the token that can write to the repository is never held by the one that
+    # builds and publishes.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish the release notes from the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="## $version " '
+            index($0, v) == 1 { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md

@@ -572,3 +572,56 @@ either spelling; and the metaphor is the product, one spine every agent reads fr
   wrote. Nothing was published under the old name, so this is the last cheap moment to do it.
 - **Rejected:** `@alexisbalayre/agent-init`. Scoped names skip the similarity check and would have
   published immediately, at the price of an install line nobody repeats from memory.
+
+## 26. Releases are cut by a tag, and the tarball check became a script
+
+Date: 2026-09-21
+
+0.1.1 ships one change a scaffolded repository will notice: the git-safety policy no longer blocks
+pushing a release tag from the trunk. Everything else merged since 0.1.0 — the identity gate, the
+audit hardening — never leaves this repository. A release that thin is only worth cutting if
+cutting one is cheap, so this decision is mostly about making it cheap.
+
+**The verification decision 23 described in prose is now `scripts/verify-package.sh`.** That
+paragraph recorded what was done by hand before the first publish: pack, install into a throwaway
+prefix, scaffold a fresh repository, probe the hooks, re-check for drift. Written down that way it
+was the step most likely to be skipped under time pressure, and it guards the one failure the test
+suite structurally cannot see — the suite runs from source, every user runs the tarball. It takes
+four seconds, so it runs on every pull request rather than only at a release.
+
+**Publishing authenticates with OIDC, not a stored token.** This repository already refuses to
+keep the private fingerprint list in the tree; a long-lived npm token is a larger version of the
+same object. The publish job holds a short-lived credential, and npm attaches provenance tying the
+published tarball to the workflow run that built it.
+
+**The tag push is what the git-safety fix in #22 made possible**, and the release procedure had to
+be written to match what that fix actually permits. The first draft said `npm version patch` and
+`git push origin main --follow-tags`, and both halves were wrong: `npm version` commits to the
+checked-out branch, and the trunk takes no commits; `--follow-tags` pushes the trunk alongside the
+tag, which is a direct push to the trunk and is blocked, correctly, by a second guard the fix never
+touched. The version bump belongs in the release pull request like any other change, leaving the
+trunk with nothing to do but carry the tag. Verified against the policy: `git push origin v0.1.0`
+and `git push origin --tags` pass from the trunk, `git push origin main --follow-tags` is blocked,
+and so is a tag push whose tag does not exist yet — the policy recognises one by resolving the ref,
+so the tag has to be created in its own command first.
+
+**The gate steps live in `.github/actions/`, called by both workflows.** release.yml claims to run
+every gate ci.yml runs, and the first draft made that claim by re-typing them, which is the
+two-copies-must-agree shape this repository already refuses elsewhere. Composite actions rather
+than a reusable workflow, because a reusable workflow renames the checks to `ci / test` and
+`ci / shell`, and main's ruleset requires `test` and `shell`: the fix for a drift risk would have
+quietly made the trunk unmergeable.
+
+The review workflow's header also claimed agentspine "is not published yet" as a reason to build
+the review tooling from the base branch rather than install it. That has been false since 0.1.0.
+The reason that survives is the one that was always doing the work: here the review tooling is the
+code under review, so building the pull request's own `src/` would hand untrusted code a job
+holding the review token.
+
+- **Cost accepted:** a tag push now publishes. A mistyped tag puts a version on the registry that
+  cannot be unpublished after 72 hours. The guards catch a tag that disagrees with `package.json`
+  and a version with no changelog entry, which is the common shape of the mistake, not every shape
+  of it.
+- **Cost accepted:** trusted publishing needs one-time configuration on npmjs.com that is
+  invisible from this repository. Until it exists the workflow fails at the final step, having
+  already run every gate. Loud, and nothing published — the right way round.

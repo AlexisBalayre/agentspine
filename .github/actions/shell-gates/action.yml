@@ -1,0 +1,28 @@
+# The shell half of the gate set. Its caller must check out the full history: audit-authors.sh
+# walks all of it, not just the pushed range.
+name: shell gates
+description: Shellcheck over every shipped shell file, and the two audits.
+
+inputs:
+  extra-fingerprints:
+    description: Private leak-audit terms, as a regex alternation. Empty checks public terms only.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # The whole emitted product is shell. This is the cheapest real-bug catcher we have.
+    - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      shell: bash
+    - run: shellcheck -s bash templates/agents/hooks/policies/*.sh templates/agents/hooks/adapters/*.sh scripts/*.sh templates/agents/scripts/*.sh templates/agents/skills/*/*.sh templates/agents/skills/*/scripts/*.sh
+      shell: bash
+    # Shipped content lands in strangers' repositories; a leak there is public and permanent.
+    - run: ./scripts/audit-templates.sh
+      shell: bash
+      env:
+        AUDIT_EXTRA_FINGERPRINTS: ${{ inputs.extra-fingerprints }}
+    # A commit published under the wrong account can only be undone by rewriting public
+    # history. Catch it before it merges, not after.
+    - run: ./scripts/audit-authors.sh
+      shell: bash
