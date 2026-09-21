@@ -149,3 +149,66 @@ describe("git-safety and release tags", () => {
     expect(run(taggedRepo(), command).status).toBe(2);
   });
 });
+
+/**
+ * The policy reads the command as text, and text cannot tell running a command from naming one.
+ * Every rule used to fire on a commit message, an echo or a heredoc that quoted the very command
+ * it forbids, which is routine in a repository whose subject is git hooks: it blocked the commit
+ * that documented the release procedure. Splitting the line into the commands a shell would run,
+ * honouring quotes, separates the two. It also closes a gap in the other direction, because
+ * naming the trunk after a global option was never caught at all.
+ */
+describe("git-safety tells running a command from naming one", () => {
+  // Carries a trailing token, because the trunk rule needs whitespace or end-of-string after the
+  // trunk name to engage at all. This is the message the policy refused.
+  const PHRASE = ["git", "push", "origin", "main", "--follow-tags"].join(" ");
+
+  function repoOn(branch: "main" | "feat/x") {
+    const root = mkdtempSync(path.join(tmpdir(), "agentspine-naming-"));
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
+    git("init", "-q", "-b", "main");
+    writeFileSync(path.join(root, "a.txt"), "x\n");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+    git("tag", "-a", "v1.2.3", "-m", "release");
+    if (branch !== "main") git("checkout", "-q", "-b", branch);
+    return root;
+  }
+
+  const run = (root: string, command: string) =>
+    spawnSync("bash", [ADAPTER, "git-safety"], {
+      input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd: root, tool_input: { command } }),
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+
+  it.each([
+    ["an echo", `echo "${PHRASE}"`],
+    ["a grep pattern", `grep -rn "${PHRASE}" docs/`],
+    ["a heredoc", `cat > x.md <<EOF\nto release, run ${PHRASE}\nEOF`],
+    ["a sed replacement", `sed -i '' 's|x|${PHRASE}|' CHANGELOG.md`],
+    ["a commit message", `git commit -m "blocked by the rule: ${PHRASE}"`],
+    ["a multi-line commit message", `git commit -m "first line\n${PHRASE}"`],
+  ])("allows %s that only names a forbidden push", (_label, command) => {
+    expect(run(repoOn("feat/x"), command).status).toBe(0);
+  });
+
+  it.each([
+    ["plainly", ["git", "push", "origin", "main"].join(" ")],
+    ["with a trailing flag", PHRASE],
+    ["through a global option", ["git", "-C", "/some/path", "push", "origin", "main"].join(" ")],
+    ["inside a shell runner", `bash -c "${PHRASE}"`],
+    ["after another command", `npm test && ${PHRASE}`],
+  ])("still blocks a push that names the trunk %s", (_label, command) => {
+    expect(run(repoOn("feat/x"), command).status).toBe(2);
+  });
+
+  it("keeps blocking a commit on the trunk even when its message names a push", () => {
+    expect(run(repoOn("main"), `git commit -m "blocked by the rule: ${PHRASE}"`).status).toBe(2);
+  });
+
+  it("does not mistake a subcommand named in an option for the subcommand itself", () => {
+    expect(run(repoOn("main"), "git log --grep=commit").status).toBe(0);
+  });
+});

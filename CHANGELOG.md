@@ -6,6 +6,23 @@ scaffolded tree — CI gates, contributor tooling, the design record — are not
 The emitted CI review workflow pins the version that scaffolded it, so upgrading a scaffolded
 repository means re-running `npx agentspine`.
 
+## 0.1.2 — 2026-09-21
+
+### Fixed
+
+- The `git-safety` hook policy read the command as one string, so it could not tell running a
+  command from naming one. A commit message, an echo, a heredoc or a grep pattern that quoted a
+  command the policy forbids was blocked as though you had run it, which in a repository whose
+  subject is git makes ordinary work impossible. The policy now splits the line into the commands
+  a shell would run, honouring quotes and backslash escapes, and reads those.
+- The same change closes a gap in the other direction: a rule naming a subcommand looked for it
+  immediately after `git`, so `git -C <path> push origin <trunk>` pushed the trunk unchallenged.
+  git's global options are now stepped over, and `bash -c "<command>"` is examined as a command
+  rather than as text.
+
+`rm -rf /` is deliberately still matched against the whole line: being wrong about a command that
+destroys the machine costs a retry, and being wrong the other way costs the machine.
+
 ## 0.1.1 — 2026-09-21
 
 ### Fixed

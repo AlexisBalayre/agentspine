@@ -625,3 +625,34 @@ holding the review token.
 - **Cost accepted:** trusted publishing needs one-time configuration on npmjs.com that is
   invisible from this repository. Until it exists the workflow fails at the final step, having
   already run every gate. Loud, and nothing published — the right way round.
+
+## 27. The hook reads commands, not text
+
+Date: 2026-09-21
+
+git-safety matched its rules against the command as one string. A string cannot tell running a
+command from naming one, and the policy's own subject matter is commands, so the failure mode was
+not exotic: writing the release procedure into `CONTRIBUTING.md` was blocked, and so was the
+commit that recorded it. Decision 26 was written around that block, through a message file.
+
+The rules now read the commands the line would run. An awk pass splits on `;`, `|`, `&` and
+newlines while tracking quotes and backslash escapes, a middle step unwraps `bash -c`, and each
+rule anchors to the start of a command rather than matching anywhere inside one. Rules name a
+subcommand and step over git's global options on the way to it.
+
+Two things this is not. It is not a shell: one level of runner unwrapping, and a line of a
+heredoc that begins with a forbidden command is still read as that command. And it is not applied
+to the `rm -rf /` rule, which still matches the whole line, because the two errors do not cost the
+same. Blocking a command that merely names a force push costs a retry. Missing one that empties
+the disk costs the disk.
+
+The same change fixed a hole nobody had noticed. Rules looked for the subcommand immediately after
+`git`, so `git -C <path> push origin main` matched nothing and pushed the trunk unchallenged. The
+over-match and the under-match were the same bug seen from two sides: a regex over prose standing
+in for knowing what the line runs.
+
+- **Cost accepted:** a hook policy now depends on awk as well as jq. awk is POSIX and was already
+  used by an adapter, but it is a second interpreter in the path of every bash call.
+- **Cost accepted:** the splitter is a parser, and parsers have edge cases a regex does not. The
+  ones known are written above rather than left to be discovered; the table of cases in
+  `test/claude-code-adapter.test.ts` is where a new one gets added.

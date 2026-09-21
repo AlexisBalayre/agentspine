@@ -5,7 +5,7 @@ Vibe, and Cursor.
 
 ## Read first
 
-- [`docs/design/0001-architecture.md`](docs/design/0001-architecture.md) — the 26 decisions and
+- [`docs/design/0001-architecture.md`](docs/design/0001-architecture.md) — the 27 decisions and
   the cost accepted by each. Do not relitigate one without recording why.
 - [`docs/capability-matrix.md`](docs/capability-matrix.md) — what each tool actually supports.
   Verified from docs, with dates. If a claim here is not in that file, verify it before relying on it.
