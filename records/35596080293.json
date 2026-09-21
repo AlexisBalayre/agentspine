@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-21T11:57:57.071Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35596080293",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35596080293",
+  "actor": "AlexisBalayre",
+  "commit_sha": "ee622e4c524076d09c964522965dc37676bf4ed2",
+  "source": "pr",
+  "pr_number": 27,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "context"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "3a0b7800a25b33c242b66c023f8c978a82d922eb",
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "67",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Decision 4's new closing sentence names decision 27 explicitly (\"Reversed by decision 27\"), but decision 27's own reversal note (around line 653, \"This overturns a decision the hook contract had already recorded\") names only CONTRACT.md, never \"decision 4\" — so the ADR's own stated convention (\"A later one may reverse an earlier one; where it does, both say so\") is only fulfilled in one direction. Not misleading, just incomplete.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "56",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The reworded wrapper-unwrapping bullet uses a curly apostrophe (\"another runner’s payload\") while every other apostrophe in this file is straight ('), a typographic inconsistency introduced by this edit.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "correctness",
+      "description": "Reviewer was blocked from writing scratch files or running spike commands (Write required approval, /tmp inaccessible, complex piped bash rejected by sandbox heuristics) to empirically test the awk SUBSTITUTION_BODIES seam behavior around the newline inserted between $COMMAND and $payloads. Conclusion (behavior-preserving, slight widening) rests on manual trace of the awk state machine rather than execution."
+    },
+    {
+      "component": "security",
+      "description": "Same sandbox restriction as correctness: could not execute the hook against crafted inputs to spike-verify the substitution-scan seam or the fail-open/fail-closed behavior of COMMANDS=$(shell_commands) under set -euo pipefail. Reasoning is static only."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "cost_usd": 3.8217017500000012,
+  "duration_ms": 481807,
+  "num_turns": 30,
+  "tokens": {
+    "input": 37,
+    "output": 23335,
+    "cache_read": 1052081,
+    "cache_creation": 73431,
+    "total": 1148884
+  }
+}
