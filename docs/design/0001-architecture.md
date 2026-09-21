@@ -2,8 +2,9 @@
 
 Status: accepted · Date: 2026-09-14
 
-The nine decisions that define `agentspine`. Each records the option taken, the rejected
-alternatives, and the cost accepted.
+The decisions that define `agentspine`, in the order they were taken. Each records the option
+taken, the rejected alternatives, and the cost accepted. A later one may reverse an earlier one;
+where it does, both say so.
 
 ## 1. Scaffolder, not sync engine
 
@@ -58,11 +59,14 @@ Normalised events, capped at three: `pre-tool:bash`, `post-edit`, `turn-end`.
   shells out. A hook that silently fails to block is worse than no hook.
 - **Not ported:** anything without a counterpart (Claude's `PreCompact`, the comment-pruner
   dispatch) stays Claude-only and is documented as such.
-- **False positives are preferred to bypasses.** `git-safety` matches the raw command text, so a
+- **False positives are preferred to bypasses.** `git-safety` matched the raw command text, so a
   command merely *containing* a dangerous pattern as data — a heredoc documenting one, a `grep`
-  for it — is blocked. Parsing shell instead would mean a parser that can disagree with the user's
-  actual shell, and a disagreement there is a bypass rather than an inconvenience. Confirmed the
-  hard way while building this: writing these very policies through a shell heredoc tripped them.
+  for it — was blocked. Parsing shell instead would mean a parser that can disagree with the
+  user's actual shell, and a disagreement there is a bypass rather than an inconvenience.
+  Confirmed the hard way while building this: writing these very policies through a shell heredoc
+  tripped them. **Reversed by decision 27**, which reads the commands the line would run instead —
+  keeping this preference as the constraint on the parser rather than as an argument against
+  having one.
 
 ## 5. Stack-agnostic quality gate
 
@@ -665,8 +669,8 @@ rule; it was written by running the old policy and the new one against the same 
 The rule had to be applied twice. A second review pass found the same mistake one level further
 out: the parser had learned about wrappers and about runners but not about one in front of the
 other, so `exec bash -c "..."` walked through, and `eval` had been dropped on the way. Each round
-was found by asking the same question -- what does the blunt version catch that this does not --
-which is the question the table now asks on every run. A parser replacing a string match should
+came from asking the same question — what does the blunt version catch that this does not — which
+is the question the table now asks on every run. A parser replacing a string match should
 expect to answer it more than once.
 
 The same change fixed a hole nobody had noticed. Rules looked for the subcommand immediately after

@@ -53,8 +53,8 @@ command is no longer mistaken for running one.
 
 It is not a shell, and the distance between it and one is where a bypass would live:
 
-- One level of runner unwrapping. A runner inside a runner payload is read as text, though a
-  wrapper in front of a runner is not: `exec bash -c ...` is still read as `bash -c`.
+- One level of runner unwrapping: a runner nested inside another runner’s payload is read as
+  text. Wrappers are not nesting, so `exec bash -c ...` is still unwrapped as `bash -c`.
 - Command substitution is not nested: the body of the outer one is read, the inner is not.
 - A wrapper is recognised from a list — `sudo`, `exec`, `nohup`, `timeout`, `env` and the rest
   named in the policy. One outside that list hides the command behind it.

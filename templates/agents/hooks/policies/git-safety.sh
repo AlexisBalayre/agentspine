@@ -109,17 +109,24 @@ unwrapped() {
 # quotes stop the outer shell expanding a substitution, but they do not survive into what a
 # runner is handed: `bash -c '$(...)'` expands inside that runner.
 shell_commands() {
-  unwrapped | awk -v strip=1 "$SPLIT_COMMANDS"
-  { printf '%s' "$COMMAND"; unwrapped; } | awk "$SUBSTITUTION_BODIES" \
+  local payloads
+  payloads=$(unwrapped)
+  printf '%s\n' "$payloads" | awk -v strip=1 "$SPLIT_COMMANDS"
+  { printf '%s\n' "$COMMAND"; printf '%s\n' "$payloads"; } | awk "$SUBSTITUTION_BODIES" \
     | awk -v strip=1 "$SPLIT_COMMANDS"
 }
+
+# Computed once. This runs before every shell command the agent makes, and each rule below would
+# otherwise re-run the whole pipeline.
+COMMANDS=$(shell_commands)
+
 # git's own global options sit between `git` and the subcommand: `-C <path>`, `-c <k=v>`,
 # `--no-pager`. Stepping over them is what makes `git -C <worktree> push` visible to a rule.
 GIT_PREFIX="^[[:space:]]*(${LEAD}[[:space:]]+)*git([[:space:]]+(-[Cc][[:space:]]+[^[:space:]]+|--[A-Za-z][A-Za-z0-9-]*(=[^[:space:]]+)?))*[[:space:]]+"
 
 # Every git invocation of one subcommand, or nothing.
 git_runs() {
-  shell_commands | grep -E "${GIT_PREFIX}$1([[:space:]]|\$)" || true
+  printf '%s\n' "$COMMANDS" | grep -E "${GIT_PREFIX}$1([[:space:]]|\$)" || true
 }
 
 # Unlike the git rules, this one still reads the whole string, and a command that merely names it
