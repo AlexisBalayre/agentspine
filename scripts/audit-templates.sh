@@ -40,8 +40,15 @@ pattern_error=$(printf '' | grep -E "$FINGERPRINTS" 2>&1 >/dev/null)
 pattern_status=$?
 # 0 matched, 1 no match; both mean the pattern compiled. Anything higher does not.
 if [ "$pattern_status" -gt 1 ]; then
-  printf 'audit-templates: fingerprint pattern does not compile (%s); fix the private list.\n' \
-    "$pattern_error" >&2
+  if [ -n "$PRIVATE" ]; then
+    # Some greps quote the offending pattern back in their diagnostic, and the pattern now
+    # carries the private terms, so repeating it here would leak exactly what this script
+    # exists to keep out of shipped content and logs.
+    printf 'audit-templates: the fingerprint pattern does not compile. The private list forms\n' >&2
+    printf 'part of it, so the error is withheld rather than echoed; check the private terms.\n' >&2
+  else
+    printf 'audit-templates: fingerprint pattern does not compile (%s).\n' "$pattern_error" >&2
+  fi
   exit 1
 fi
 # Names and paths that only exist in the repository this content was extracted from.
