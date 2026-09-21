@@ -113,8 +113,8 @@ Cursor. Codex and Mistral Vibe have no project-scoped subagents, so nothing is e
 `review-changes` degrades to dispatching the reviewer briefs inline — the review shrinks in
 mechanism, never silently to nothing.
 
-**Prerequisites:** Node >= 20 to run the scaffolder, `jq` and bash >= 3.2 on any machine where the
-hooks run.
+**Prerequisites:** Node >= 20 to run the scaffolder, and `jq`, `awk`, `sed` and bash >= 3.2 on any
+machine where the hooks run.
 
 ## Reviewing every pull request
 

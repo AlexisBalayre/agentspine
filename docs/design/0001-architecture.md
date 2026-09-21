@@ -2,8 +2,9 @@
 
 Status: accepted · Date: 2026-09-14
 
-The nine decisions that define `agentspine`. Each records the option taken, the rejected
-alternatives, and the cost accepted.
+The decisions that define `agentspine`, in the order they were taken. Each records the option
+taken, the rejected alternatives, and the cost accepted. A later one may reverse an earlier one;
+where it does, both say so.
 
 ## 1. Scaffolder, not sync engine
 
@@ -58,11 +59,14 @@ Normalised events, capped at three: `pre-tool:bash`, `post-edit`, `turn-end`.
   shells out. A hook that silently fails to block is worse than no hook.
 - **Not ported:** anything without a counterpart (Claude's `PreCompact`, the comment-pruner
   dispatch) stays Claude-only and is documented as such.
-- **False positives are preferred to bypasses.** `git-safety` matches the raw command text, so a
+- **False positives are preferred to bypasses.** `git-safety` matched the raw command text, so a
   command merely *containing* a dangerous pattern as data — a heredoc documenting one, a `grep`
-  for it — is blocked. Parsing shell instead would mean a parser that can disagree with the user's
-  actual shell, and a disagreement there is a bypass rather than an inconvenience. Confirmed the
-  hard way while building this: writing these very policies through a shell heredoc tripped them.
+  for it — was blocked. Parsing shell instead would mean a parser that can disagree with the
+  user's actual shell, and a disagreement there is a bypass rather than an inconvenience.
+  Confirmed the hard way while building this: writing these very policies through a shell heredoc
+  tripped them. **Reversed by decision 27**, which reads the commands the line would run instead —
+  keeping this preference as the constraint on the parser rather than as an argument against
+  having one.
 
 ## 5. Stack-agnostic quality gate
 
@@ -625,3 +629,59 @@ holding the review token.
 - **Cost accepted:** trusted publishing needs one-time configuration on npmjs.com that is
   invisible from this repository. Until it exists the workflow fails at the final step, having
   already run every gate. Loud, and nothing published — the right way round.
+
+## 27. The hook reads commands, not text
+
+Date: 2026-09-21
+
+git-safety matched its rules against the command as one string. A string cannot tell running a
+command from naming one, and the policy's own subject matter is commands, so the failure mode was
+not exotic: writing the release procedure into `CONTRIBUTING.md` was blocked, and so was the
+commit that recorded it. Decision 26 was written around that block, through a message file.
+
+The rules now read the commands the line would run. An awk pass splits on `;`, `|`, `&` and
+newlines while tracking quotes and backslash escapes, a middle step unwraps `bash -c`, and each
+rule anchors to the start of a command rather than matching anywhere inside one. Rules name a
+subcommand and step over git's global options on the way to it.
+
+Two things this is not. It is not a shell: one level of runner unwrapping, no nested command
+substitution, a fixed list of wrapper words, and a line of a heredoc that begins with a forbidden
+command is still read as that command. And it is not applied to the `rm -rf /` rule, which still
+matches the whole line, because the two errors do not cost the same. Blocking a command that
+merely names a force push costs a retry. Missing one that empties the disk costs the disk.
+
+**This overturns a decision the hook contract had already recorded.** `CONTRACT.md` named literal
+matching a known limitation and called it deliberate, on the grounds that a parser disagreeing
+with the user's real shell is a bypass rather than an inconvenience. That objection was right on
+the mechanism and wrong on the price. The first version of this parser proved the mechanism: it
+read commands only where the line began with `git`, so `sudo git push origin main`,
+`exec`, `nohup`, `timeout 5`, `command`, `time` and a `bash -c` payload with anything before the
+git call all walked through rules the blunt string match had always caught. Five false blocks
+traded for eight bypasses is not a fix.
+
+So the objection is answered rather than dropped, as a rule the file now has to keep: **the
+parser must never be more permissive than the string match was.** Wrapper words are stepped over,
+a runner's payload is unquoted before it is read, and the body of a command substitution is
+collected and read as commands -- which closes two holes the string match never covered. The
+table of wrapped commands in `test/claude-code-adapter.test.ts` is what holds the file to the
+rule; it was written by running the old policy and the new one against the same list.
+
+The rule had to be applied twice. A second review pass found the same mistake one level further
+out: the parser had learned about wrappers and about runners but not about one in front of the
+other, so `exec bash -c "..."` walked through, and `eval` had been dropped on the way. Each round
+came from asking the same question — what does the blunt version catch that this does not — which
+is the question the table now asks on every run. A parser replacing a string match should
+expect to answer it more than once.
+
+The same change fixed a hole nobody had noticed. Rules looked for the subcommand immediately after
+`git`, so `git -C <path> push origin main` matched nothing and pushed the trunk unchallenged. The
+over-match and the under-match were the same bug seen from two sides: a regex over prose standing
+in for knowing what the line runs.
+
+- **Cost accepted:** a hook policy now depends on awk and sed as well as jq. Both are POSIX, and
+  awk was already used by `quality-gate.sh` -- a policy, not an adapter -- but this puts a second
+  interpreter in the path of every bash call. `CONTRACT.md` and the README now say so, since a
+  machine missing either would lose the hook rather than fail loudly.
+- **Cost accepted:** the splitter is a parser, and parsers have edge cases a regex does not. The
+  ones known are written above rather than left to be discovered; the table of cases in
+  `test/claude-code-adapter.test.ts` is where a new one gets added.
