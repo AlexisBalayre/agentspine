@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-21T12:50:33.442Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35601220885",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35601220885",
+  "actor": "AlexisBalayre",
+  "commit_sha": "bcc8fcdc3df3909d81aa71ece03597ffd9e0c979",
+  "source": "pr",
+  "pr_number": 28,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "security",
+    "context"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "test/opencode-plugin.test.ts",
+      "line": "30-34",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "beforeAll's four bootstrap spawnSync calls (git init, add, commit, checkout) don't check their exit status, so a local git failure (e.g. git unavailable) would produce a confusing downstream failure instead of a clear diagnostic.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/opencode-plugin.test.ts",
+      "line": "29",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The mkdtempSync temp directory created in beforeAll is never removed; each test run leaks an agentspine-opencode-* directory under the OS tmpdir.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/opencode-plugin.test.ts",
+      "line": "34",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The git checkout to a feat/x branch in beforeAll has no effect on any assertion in this file (git-safety.sh blocks --force pushes unconditionally, with no branch-state check for that rule) and isn't explained, reading like leftover setup copied from a different test helper.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "116",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "New prose on this line uses an em-dash (\"opencode's is a half-measure by comparison — the emitted plugin is loaded...\"); per the standing house-style rule in .agents/agents/review-docs.md, em/en dashes in newly added prose should be avoided in favor of a colon or period.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/opencode-plugin.test.ts",
+      "line": "14, 20",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The new docstring atop the describe block uses the \" -- \" em-dash substitute twice (lines 14 and 20); per .agents/agents/review-docs.md this counts as an em-dash violation in newly added prose and should be replaced with a colon or a split sentence.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "cost_usd": 2.6630715,
+  "duration_ms": 360946,
+  "num_turns": 29,
+  "tokens": {
+    "input": 37,
+    "output": 15856,
+    "cache_read": 949446,
+    "cache_creation": 55581,
+    "total": 1020920
+  }
+}
