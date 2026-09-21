@@ -572,3 +572,42 @@ either spelling; and the metaphor is the product, one spine every agent reads fr
   wrote. Nothing was published under the old name, so this is the last cheap moment to do it.
 - **Rejected:** `@alexisbalayre/agent-init`. Scoped names skip the similarity check and would have
   published immediately, at the price of an install line nobody repeats from memory.
+
+## 26. Releases are cut by a tag, and the tarball check became a script
+
+Date: 2026-09-21
+
+0.1.1 ships one change a scaffolded repository will notice: the git-safety policy no longer blocks
+pushing a release tag from the trunk. Everything else merged since 0.1.0 — the identity gate, the
+audit hardening — never leaves this repository. A release that thin is only worth cutting if
+cutting one is cheap, so this decision is mostly about making it cheap.
+
+**The verification decision 23 described in prose is now `scripts/verify-package.sh`.** That
+paragraph recorded what was done by hand before the first publish: pack, install into a throwaway
+prefix, scaffold a fresh repository, probe the hooks, re-check for drift. Written down that way it
+was the step most likely to be skipped under time pressure, and it guards the one failure the test
+suite structurally cannot see — the suite runs from source, every user runs the tarball. It takes
+four seconds, so it runs on every pull request rather than only at a release.
+
+**Publishing authenticates with OIDC, not a stored token.** This repository already refuses to
+keep the private fingerprint list in the tree; a long-lived npm token is a larger version of the
+same object. The publish job holds a short-lived credential, and npm attaches provenance tying the
+published tarball to the workflow run that built it.
+
+**The tag push is what decision 22 made possible.** git-safety allows it because a tag publishes a
+ref that points at the trunk rather than moving it. That fix and this workflow are one thought,
+arrived at from opposite ends.
+
+Decision 21's header also claimed agentspine "is not published yet" as a reason to build the review
+tooling from the base branch rather than install it. That has been false since 0.1.0. The reason
+that survives is the one that was always doing the work: here the review tooling is the code under
+review, so building the pull request's own `src/` would hand untrusted code a job holding the
+review token.
+
+- **Cost accepted:** a tag push now publishes. A mistyped tag puts a version on the registry that
+  cannot be unpublished after 72 hours. The guards catch a tag that disagrees with `package.json`
+  and a version with no changelog entry, which is the common shape of the mistake, not every shape
+  of it.
+- **Cost accepted:** trusted publishing needs one-time configuration on npmjs.com that is
+  invisible from this repository. Until it exists the workflow fails at the final step, having
+  already run every gate. Loud, and nothing published — the right way round.
