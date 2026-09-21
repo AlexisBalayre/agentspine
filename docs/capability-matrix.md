@@ -102,13 +102,19 @@ restores implicit invocation. A test asserts the emitted payload for that reason
   offers no documented way to feed hook output back into the agent's context, so a failing gate is
   reported there and enforced on Claude Code.
 - **opencode is the only adapter `doctor` cannot probe.** The other four are exercised with a real
-  payload and asserted to block; opencode's shim needs a live session.
+  payload and asserted to block; opencode's shim is a plugin the host loads rather than a script
+  that can be handed a payload. What is asserted instead is the shim's own half of the contract:
+  Node loads the emitted plugin, calls its handlers, and checks that a blocked command throws and
+  an ordinary one does not. Whether opencode calls those handlers, and with which argument shapes,
+  is the half that still needs a live session.
 - **Codex `Stop` wiring is inferred.** The documented example covers `[[hooks.PreToolUse]]`; the
   `Stop` block follows the same documented shape but has not been confirmed against a running
   Codex.
 - **Three of five have never been run against.** Codex, opencode and Cursor wiring is derived from
-  their documentation and has not been observed working. Vibe's has: its own loader accepts the
-  emitted `hooks.toml` in strict mode, asserted by a test that skips where Vibe is absent.
+  their documentation and has not been observed working by the host itself. Vibe's has: its own
+  loader accepts the emitted `hooks.toml` in strict mode, asserted by a test that skips where Vibe
+  is absent. opencode's is a half-measure by comparison: the emitted plugin is loaded and its
+  handlers are called, but by Node, not by opencode.
 - **Mistral Vibe agents are user-global launch profiles**, not project-scoped dispatched
   subagents. Not a like-for-like target, so nothing is emitted.
 - **Claude-only:** `PreCompact`, the comment-pruner dispatch, and `Use PROACTIVELY` auto-dispatch.
@@ -120,7 +126,7 @@ restores implicit invocation. A test asserts the emitted payload for that reason
 | Claude Code | **2.1.270** | 2026-09-14 | docs, plus this repo dogfoods the emitted wiring daily |
 | Mistral Vibe | **2.25.3** | 2026-09-14 | source, plus the emitted `hooks.toml` parsed by Vibe's own strict loader |
 | Codex | not installed | 2026-09-17 | docs, plus its skills loader and provider read at `fcf0545` for the invocation switch |
-| opencode | not installed | 2026-09-14 | docs only |
+| opencode | not installed | 2026-09-21 | docs, plus the emitted plugin loaded and its handlers exercised by Node |
 | Cursor | not installed | 2026-09-14 | docs only |
 
 "Docs only" means nobody has yet run `agentspine` against that tool and watched a hook fire. The
