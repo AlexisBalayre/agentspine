@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-21T10:49:43.573Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35589654355",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35589654355",
+  "actor": "AlexisBalayre",
+  "commit_sha": "faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd",
+  "source": "pr",
+  "pr_number": 27,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "65-80",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The new command-splitting pipeline requires the emitted line to start literally with `git`, so any runner prefix outside the unwrap list (sudo, exec, nohup, timeout, command, find -exec, xargs, command substitution, backticks) or a single `bash -c` whose payload has a command before the git call bypasses every rule (force-push, hard-reset, trunk-commit, trunk-push) that the old raw-string grep used to catch.",
+      "body": "### The concern\n\n`git_runs()` filters the output of `shell_commands()` through `GIT_PREFIX`, which is anchored with `^[[:space:]]*` and only tolerates a `VAR=value` prefix or `git` at the start of the line:\n\n```sh\nGIT_PREFIX='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*git(...)*[[:space:]]+'\ngit_runs() {\n  shell_commands | grep -E \"${GIT_PREFIX}$1([[:space:]]|\\$)\" || true\n}\nPUSHES=$(git_runs push)\nCOMMITS=$(git_runs commit)\n```\n\n`shell_commands()` only unwraps one specific prefix shape (`sudo? (bash|sh|zsh|env) -c <payload>` or `eval <payload>`) before re-splitting:\n\n```sh\nshell_commands() {\n  printf '%s' \"$COMMAND\" \\\n    | awk -v strip=0 \"$SPLIT_COMMANDS\" \\\n    | sed -E 's/^[[:space:]]*(sudo[[:space:]]+)?(bash|sh|zsh|env)[[:space:]]+-c[[:space:]]+//; s/^[[:space:]]*eval[[:space:]]+//' \\\n    | awk -v strip=1 \"$SPLIT_COMMANDS\"\n}\n```\n\nTwo independent regressions follow, both confirmed by hand-tracing the awk/sed pipeline character-by-character and both verified to have been caught by the pre-PR raw-string grep:\n\n**Any runner prefix not in the unwrap list leaves the line not starting with `git`.** `sudo`, `exec`, `nohup`, `timeout <n>`, `command`, `find ... -exec ... \\;`, and `xargs` all fall through — the emitted line starts with the runner name, `GIT_PREFIX` never matches, and `PUSHES`/`COMMITS` come back empty:\n\n```\nsudo git push -f origin main            # force push -> now allowed\nexec git push -f origin main            # force push -> now allowed\nnohup git push origin main              # trunk push -> now allowed\ntimeout 30 git push -f origin main      # force push -> now allowed\nfind . -exec git push -f origin main \\; # force push -> now allowed\n```\n\n**A single `bash -c \"<payload>\"` with more than one command in the payload bypasses too**, because the sed step (line 68) strips only the `bash -c ` token and leaves the payload's own surrounding quotes intact; the second awk pass (line 69, strip=1) then re-enters quote state at that leading quote and treats everything up to the closing quote — including any `&&`, `;`, `|` inside — as still-quoted data, so it never re-splits the payload:\n\n```\nbash -c \"cd /repo && git push origin main\"     # trunk push -> now allowed\nbash -c \"echo hi; git push origin main\"        # trunk push -> now allowed\nbash -c \"true && git reset --hard HEAD~1\"      # hard reset -> now allowed\n```\n\nAll of these were caught by the merge-base version's raw `grep -qE 'git[[:space:]]+push...'` / `'git[[:space:]]+reset[[:space:]]+--hard'` substring matches (https://github.com/AlexisBalayre/agentspine/blob/1581accd2691ec836fe60c97339d1600d931132f/templates/agents/hooks/policies/git-safety.sh#L36-L42). None of these shapes fall under the PR's declared non-goals (\"one level of `bash -c` unwrapping\", \"a heredoc line that begins with a forbidden command is still read as that command\") — a `bash -c` with a compound payload is exactly one level of unwrapping, and `sudo`/`exec`/`nohup` are not heredocs. The new test suite's `bash -c` case (`test/claude-code-adapter.test.ts`, `\"inside a shell runner\"`) only exercises a payload that already starts with `git`, so it doesn't catch either regression.\n\nPer the PR's own Merge Danger section, this is \"the hook that stands between every agent and every destructive command in every scaffolded repository, so a parser bug here fails open\" — these are live, agent-plausible bypasses of exactly that hook (`sudo git push` in particular is a common reflex when a bare push errors on permissions).\n\nhttps://github.com/AlexisBalayre/agentspine/blob/faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd/templates/agents/hooks/policies/git-safety.sh#L65-L80",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "44-50",
+      "area": "context",
+      "confidence": "high",
+      "tag": "important",
+      "description": "CONTRACT.md's 'Known limitation: literal matching' section still documents the pre-PR behavior (a heredoc or grep naming a forbidden command is 'blocked as a false positive', described as deliberate) which the PR's own new test suite now contradicts for the push/commit/reset/tag rules.",
+      "body": "CONTRACT.md (untouched by this PR — `git diff 1581accd2691ec836fe60c97339d1600d931132f..HEAD -- templates/agents/hooks/CONTRACT.md` is empty), lines 44-47:\n\n> \"`git-safety` matches patterns against the raw command text. A command that merely *contains* a dangerous pattern as data — a heredoc writing documentation, a `grep` for the pattern itself — is blocked as a false positive. This is deliberate: the alternative is parsing shell...\"\n\nThe PR's new test file directly contradicts this for exactly the cases CONTRACT.md names as examples:\n\n```js\nit.each([\n  [\"an echo\", `echo \"${PHRASE}\"`],\n  [\"a grep pattern\", `grep -rn \"${PHRASE}\" docs/`],\n  [\"a heredoc\", `cat > x.md <<EOF\\nto release, run ${PHRASE}\\nEOF`],\n  ...\n])(\"allows %s that only names a forbidden push\", (_label, command) => {\n  expect(run(repoOn(\"feat/x\"), command).status).toBe(0);\n});\n```\n— https://github.com/AlexisBalayre/agentspine/blob/faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd/test/claude-code-adapter.test.ts#L186-L195\n\nCONTRACT.md is the normalized contract every host adapter (Claude Code, opencode, Codex, Mistral Vibe, Cursor) is written against; leaving its 'Known limitation' section describing behavior the shipped code no longer has for most rules (only `rm -rf /` still does whole-string matching, per the PR's own stated, narrower carve-out) will mislead whoever next audits or extends an adapter against this contract.\n\nhttps://github.com/AlexisBalayre/agentspine/blob/faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd/templates/agents/hooks/CONTRACT.md#L44-L50",
+      "suggestion": "Update the 'Known limitation' section to state that push/commit/reset/tag rules now distinguish running a command from naming one (via the command-splitting pipeline), narrowing the remaining literal-matching caveat to the `rm -rf /` rule and the declared non-goals (single-level `bash -c` unwrapping only; a heredoc line that itself begins with a forbidden command is still read as that command)."
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "40",
+      "area": "context",
+      "confidence": "high",
+      "tag": "important",
+      "description": "CONTRACT.md's Requirements section lists only bash>=3.2 and jq, but git-safety.sh's shell_commands() now hard-depends on awk (and pipes through sed), which the PR's own ADR decision 27 names as an explicitly accepted new cost — yet the cross-adapter environment spec isn't updated to list it.",
+      "body": "CONTRACT.md's Requirements section, line 40: \"`bash` >= 3.2 and `jq`.\" No mention of `awk` or `sed`.\n\n`git-safety.sh`'s `shell_commands()` now pipes through both:\n```sh\n| awk -v strip=0 \"$SPLIT_COMMANDS\" \\\n| sed -E '...' \\\n| awk -v strip=1 \"$SPLIT_COMMANDS\"\n```\n— https://github.com/AlexisBalayre/agentspine/blob/faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd/templates/agents/hooks/policies/git-safety.sh#L65-L70\n\nAnd the PR's own new ADR decision 27 explicitly calls this out as an accepted cost: \"a hook policy now depends on awk as well as jq... it is a second interpreter in the path of every bash call.\" — https://github.com/AlexisBalayre/agentspine/blob/faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd/docs/design/0001-architecture.md#L654-L655\n\nCONTRACT.md's Requirements table is the normalized statement of what every host environment must provision for every adapter (\"Policies are written once and know nothing about which agent invoked them\"). Since the PR itself treats the new awk/sed dependency as worth recording, but doesn't extend that record to the one document downstream adapter maintainers are pointed to for provisioning requirements, the table is now incomplete relative to what the shipped policy needs.\n\nhttps://github.com/AlexisBalayre/agentspine/blob/faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd/templates/agents/hooks/CONTRACT.md#L40",
+      "suggestion": "Update the Requirements line to `bash >= 3.2, jq, and awk (POSIX; sed is also used).`"
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "654-655",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "important",
+      "description": "Decision 27's 'Cost accepted' bullet claims awk 'was already used by an adapter', but awk's only prior use in the hooks tree is in quality-gate.sh, a policy — a category CONTRACT.md explicitly distinguishes from adapters, and no adapter under templates/agents/hooks/adapters/ uses awk.",
+      "body": "Decision 27's cost-accepted bullet reads:\n\n> \"awk is POSIX and was already used by an adapter, but it is a second interpreter in the path of every bash call.\"\n\nThis is factually wrong. Searched the pre-PR tree for every use of `awk` in the hooks tree:\n\n```\n$ git grep -n \"awk\" 1581accd2691ec836fe60c97339d1600d931132f -- templates/agents/hooks/\n1581accd...:templates/agents/hooks/policies/quality-gate.sh:26:  awk -v want=\"$1\" -v idx=\"$2\" '\n```\n\nThe only hit is `templates/agents/hooks/policies/quality-gate.sh` — a **policy**, not an adapter. `templates/agents/hooks/adapters/` (Claude Code, opencode, Codex, Mistral Vibe, Cursor) has zero awk usage. CONTRACT.md itself draws this exact distinction: \"Policies are written once and know nothing about which agent invoked them. Adapters translate a host tool's native input into this contract.\"\n\nA 'Cost accepted' line exists specifically so a future reader can judge whether to revisit the tradeoff; citing the wrong layer understates how new the awk dependency actually is where it matters (the adapter layer that ships per-tool and sits in the path of every bash call the ADR is talking about).\n\nhttps://github.com/AlexisBalayre/agentspine/blob/faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd/docs/design/0001-architecture.md#L654-L655",
+      "suggestion": "awk is POSIX and was already used by another policy (quality-gate.sh), but it is a second interpreter in the path of every bash call."
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "77",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The comment '# Every git invocation of one subcommand, or nothing.' above git_runs() restates the function's obvious one-line body rather than explaining a non-obvious why (e.g. it doesn't explain the `|| true` needed against `set -euo pipefail`), which AGENTS.md's Comments rule asks new comments to avoid.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "163-165",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The comment above the PHRASE constant claims a trailing token is needed 'because the trunk rule needs whitespace or end-of-string after the trunk name to engage at all', but the trunk-push regex already matches end-of-string with no trailing content, and the adjacent 'plainly' test case (no trailing token) proves the rule engages without it — the comment states a necessity the file's own test disproves, so it won't help a future maintainer re-derive the real reason for --follow-tags.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "638-652",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Decision 27 introduces command-splitting (an admitted 'parser') for the push/commit/reset/tag rules without naming or cross-referencing decision 4, which explicitly accepted raw-text matching over parsing shell specifically to avoid a parser disagreeing with the user's real shell — a reader consulting decision 4 alone would believe git-safety still avoids parsing on principle, which decision 27 quietly reverses for most rules.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "CHANGELOG.md",
+      "line": "23-24",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The trailing standalone paragraph about rm -rf / (unchanged behavior, not part of this release's fix) breaks the bullets-only format the adjacent 0.1.1 entry uses, and repeats near-verbatim rationale already stated in the git-safety.sh comment and the ADR — the same reasoning is now written in three places instead of once where it's authoritative (the ADR).",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "62,83",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "Two new comments use ' -- ' as an em-dash substitute in prose (line 62: 'unwraps a shell runner -- the payload...'; line 83: 'is blocked too, which is the wrong answer in the same way -- but being wrong...'), which the project's docs style flags when it appears in new prose.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "111-115",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "is_tag_push() iterates every whitespace-token in $PUSHES and returns true if any matches an existing tag name; a repo with a tag literally named 'main' (or 'origin'/'push'/'git') would let a direct trunk push slip through as a false-negative tag push. This behavior predates the PR (the old code did the same over $COMMAND, an even wider surface); the PR's narrowing to $PUSHES is a slight improvement, not a regression, so this is not new.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 2,
+  "is_error": false,
+  "cost_usd": 5.6603176999999985,
+  "duration_ms": 727003,
+  "num_turns": 42,
+  "tokens": {
+    "input": 55,
+    "output": 44664,
+    "cache_read": 2131490,
+    "cache_creation": 123053,
+    "total": 2299262
+  }
+}
