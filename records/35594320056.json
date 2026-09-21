@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-21T11:45:54.649Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35594320056",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35594320056",
+  "actor": "AlexisBalayre",
+  "commit_sha": "3a0b7800a25b33c242b66c023f8c978a82d922eb",
+  "source": "pr",
+  "pr_number": 27,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "context"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "916ec93409eb9572de38beb0da16862490e14305",
+  "prior_importants": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "82-107",
+      "status": "resolved"
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "82-85",
+      "status": "resolved"
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "55-98",
+      "status": "resolved"
+    }
+  ],
+  "findings": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "111-115",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "unwrapped() is invoked twice per shell_commands() call (once directly, once inside the substitution-extraction brace group), duplicating the full split+unwrap subprocess pipeline for the same input instead of capturing its output once and reusing it — introduced by this delta, not pre-existing.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "115-116",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "Relocating WRAPPER/LEAD earlier in the file dropped the blank line that used to separate blocks: shell_commands()'s closing brace now butts directly against the unrelated GIT_PREFIX comment with no separator, breaking the file's otherwise-consistent one-blank-line-between-blocks convention.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "668",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The new paragraph this commit inserts ('The rule had to be applied twice...') uses the ' -- ' em-dash substitute twice in new prose ('asking the same question -- what does the blunt version catch that this does not --'), which the project's docs style flags for new prose even though older sections of the same file already use this style.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "56",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The updated limitation bullet's clause 'a wrapper in front of a runner is not' elides its antecedent ('read as text') across a long intervening clause, reading ambiguously on first pass before the trailing example resolves it. The underlying claim is accurate; this is a readability nit only.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": null,
+      "area": "security",
+      "confidence": "high",
+      "tag": "pre-existing",
+      "description": "The lexical parser recognizes only a fixed wrapper/runner vocabulary and single-level quote handling; several distinct ways bash can still run a git command bypass it entirely — ANSI-C/localized quoting (`bash -c $'git push -f origin main'`, `bash -c $\"...\"`), a backslash-escaped command name (`\\git push -f origin main`), piping the command into a shell (`echo \"git push -f origin main\" | sh`), and a runner payload split across mixed single/double-quoted segments (`bash -c '$(git push -f origin main)'\"$(git commit -m x)\"`). Each of these is a command the pre-parser raw substring match would have caught, which is in tension with the PR's own stated invariant that 'the parser must never be more permissive than the string match was.' Verified present at both 916ec93 and the current HEAD — predates this delta and is not introduced or worsened by it.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "cost_usd": 6.074170150000003,
+  "duration_ms": 934920,
+  "num_turns": 38,
+  "tokens": {
+    "input": 55,
+    "output": 60899,
+    "cache_read": 1961799,
+    "cache_creation": 138310,
+    "total": 2161063
+  }
+}
