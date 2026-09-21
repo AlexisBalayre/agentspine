@@ -19,6 +19,9 @@ jobs:
       # This repository is scaffolded by its own tool: fail if the generator and the
       # committed tree have drifted apart. Content-compared, so the shared symlinks pass.
       - run: node dist/cli.js --check --tools claude-code,opencode --packs thinking,engineering,planning,review
+      # The suite above runs from source. This one scaffolds from the packed tarball, which is
+      # the only way a file missing from "files" or a lost exec bit shows up before a release.
+      - run: ./scripts/verify-package.sh
 
   shell:
     runs-on: ubuntu-latest
