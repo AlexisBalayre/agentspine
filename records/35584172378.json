@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-21T09:51:31.523Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35584172378",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35584172378",
+  "actor": "AlexisBalayre",
+  "commit_sha": "c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe",
+  "source": "pr",
+  "pr_number": 26,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "CONTRIBUTING.md",
+      "line": "78-85",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The new release procedure's exact command, `git push origin main --follow-tags`, is blocked by the unmodified git-safety hook, contradicting this PR's central premise that the fix now allows it.",
+      "body": "This PR's whole premise — stated in [`docs/design/0001-architecture.md` decision 26](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/docs/design/0001-architecture.md#L580-L599) and [`CHANGELOG.md`](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/CHANGELOG.md#L13-L15) — is that \"the git-safety policy no longer blocks pushing a release tag from the trunk.\" This section then instructs, verbatim:\n\n```bash\nnpm version patch\ngit push origin main --follow-tags\n```\n\nBut [`templates/agents/hooks/policies/git-safety.sh`](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/templates/agents/hooks/policies/git-safety.sh#L44-L66) — unchanged by this PR — has **two** separate trunk-push guards. The first (L58-62) correctly exempts a tag push via `is_tag_push()`. The second, unconditional guard (L64-66):\n```bash\nif printf '%s' \"$COMMAND\" | grep -qE \"git[[:space:]]+push[[:space:]]+.*[[:space:]]$TRUNK([[:space:]]|$)\"; then\n  block \"direct push to $TRUNK. Open a pull request instead.\"\nfi\n```\nhas no `is_tag_push` exemption at all, and its regex matches `git push origin main --follow-tags` (`.* ` = `origin`, then a space, then `main`, then the trailing space before `--follow-tags`). Verified both by static trace and by executing the script directly against this exact command: it exits 2 with `BLOCKED by agentspine git-safety: direct push to main. Open a pull request instead.`\n\nA maintainer following this section verbatim will be blocked. The underlying fix decision 26 describes and attributes to \"decision 22\" (itself a misattribution — decision 22 is about skill-invocation keys, unrelated to git-safety) only patched the first guard; the second was never updated to share the exemption.",
+      "suggestion": null
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "line": "78-85",
+      "area": "conventions",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The new \"Cutting a release\" section instructs `npm version patch` (which commits and tags) directly on the trunk, contradicting AGENTS.md's unqualified \"Never commit to `main`. Branch per change, PRs only.\" with no documented exception.",
+      "body": "[AGENTS.md](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/AGENTS.md) states under \"## Git workflow\": **\"Never commit to `main`. Branch per change, PRs only.\"** — unconditional, with no release-time carve-out anywhere in the document.\n\nThis PR's new [\"Cutting a release\" section](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/CONTRIBUTING.md#L78-L85) reads:\n```\nFrom the trunk, once the change is merged:\n\nnpm version patch        # minor / major as the change warrants\ngit push origin main --follow-tags\n```\n`npm version patch` bumps `package.json` and, by default (no `.npmrc` or lifecycle override in this repo changes this), creates a git **commit** and tag on whatever branch is checked out — here, explicitly \"the trunk.\" That is a commit landing on `main` outside a branch/PR, exactly what AGENTS.md forbids. Nothing in AGENTS.md or CONTRIBUTING.md carves out an exception for releases, and the git-safety hook's own agent-tooling scope doesn't change what the written rule says for a human following this doc.",
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "line": "48-61",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "important",
+      "description": "release.yml re-types ci.yml's entire gate-step list verbatim with no shared source or drift-check, unlike this project's own established precedent for the identical two-artifacts-must-agree problem.",
+      "body": "[`release.yml` L48-61](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/.github/workflows/release.yml#L48-L61) re-types [`ci.yml`'s gate commands](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/.github/workflows/ci.yml#L16-L41) character-for-character: `npm run typecheck`, `npm run build`, `npm test`, the full `node dist/cli.js --check ...` invocation, the full `shellcheck -s bash ...` glob list, `./scripts/audit-templates.sh`, `./scripts/audit-authors.sh`, `./scripts/verify-package.sh`. There is no `workflow_call`, no composite action, and no test asserting the two lists match. `release.yml`'s own header comment asserts \"Every gate from ci.yml runs again here\" — a guarantee enforced only by whoever remembers to update both files. If a future PR adds a gate to `ci.yml` and forgets `release.yml`, both stay green and that guarantee silently becomes false at exactly the moment (a tag push, possibly against a commit CI never saw, per the same comment) it matters most.\n\nThis project already has a checked safeguard for the identical problem shape elsewhere: `scripts/render-review-workflow.mjs` (a generator) paired with `test/workflow-sync.test.ts`, which fails CI if the committed `.github/workflows/claude-code-review.yml` drifts from what the generator renders. `release.yml`/`ci.yml` reintroduce the same \"two pipeline definitions must stay identical\" shape without that safeguard, and nothing in this PR's ADR entry or CHANGELOG records that omission as an accepted tradeoff.",
+      "suggestion": null
+    },
+    {
+      "file": "package-lock.json",
+      "line": null,
+      "area": "context",
+      "confidence": "high",
+      "tag": "important",
+      "description": "package.json was bumped to 0.1.1 but package-lock.json was left at 0.1.0; claude-code-review.yml's bare `npm ci` (no fallback, unlike ci.yml/release.yml) will fail on the next run against main.",
+      "body": "This PR bumps [`package.json`'s version to `0.1.1`](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/package.json#L3) but does not touch `package-lock.json`, whose root `version` (and `packages[\"\"].version`) is still `0.1.0`.\n\n`.github/workflows/claude-code-review.yml` has a \"Build review tooling from the base branch\" step, present in both the PR-review job and the comment-triggered job ([L108-119](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/.github/workflows/claude-code-review.yml#L108-L119) and [L296-310](https://github.com/AlexisBalayre/agentspine/blob/c1224a0b67e81cc179a2d31bf533ac48f3c3a2fe/.github/workflows/claude-code-review.yml#L296-L310)), that runs a bare `npm ci --ignore-scripts --prefix \"$dir\"` against a fresh worktree of `origin/<base>` — with **no** `|| npm install` fallback, unlike `ci.yml` and `release.yml` which both use `npm ci || npm install`.\n\n`npm ci`'s own sync-check (`lib/utils/validate-lockfile.js` in npm's source) walks the full inventory including the root package entry, and throws `Invalid: lock file's agentspine@0.1.0 does not satisfy agentspine@0.1.1` on exactly this mismatch. Once this PR merges, the next PR or `@claude review` comment that triggers `claude-code-review.yml` will hit this failure before the reviewer tooling can even build, breaking the dogfooded review workflow itself.",
+      "suggestion": "Run `npm install` to regenerate `package-lock.json` at 0.1.1 and commit it alongside the `package.json` bump in this PR."
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "601-605",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "\"Decision 21's header also claimed...\" is an imprecise citation — the quoted phrase lived in the workflow file's header comment (and render-review-workflow.mjs's HEADER constant), not in decision 21's own ADR text, which only references that file.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "line": null,
+      "area": "security",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "No tag-protection ruleset restricts who can push a `v*` tag or requires it point at a commit that passed CI; anyone with repo write access can trigger a publish. By design (release.yml re-runs every gate), but worth a ruleset if tightening is ever desired.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "line": "32",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`npm install -g npm@latest` floats to whatever npm resolves at tag-push time rather than pinning a specific version, adding one moving supply-chain input to the publish job.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "line": "33",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "`npm ci || npm install` falls back to a potentially different dependency resolution if the lockfile is out of sync — a pattern already present in ci.yml, not introduced by this PR.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "package.json",
+      "line": "14",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "package.json's `prepublishOnly` script reruns build+test a second time inside `npm publish`, redundant with release.yml's explicit earlier build/test steps — harmless but adds a few minutes per release.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "This run's .claude-pr/ snapshot only contained .claude/ and CLAUDE.md, not AGENTS.md/.agents/templates as the claude-code-review.yml workflow comment (RESTORE_PATHS=\"AGENTS.md .agents templates\") says it should copy there. Did not block the review — gh pr diff / git diff against the merge base gave the real PR content for those paths regardless — but the .claude-pr/ snapshot mechanism itself appears incomplete in this run."
+    }
+  ],
+  "comments_posted_actual": 3,
+  "is_error": false,
+  "cost_usd": 8.617016700000004,
+  "duration_ms": 897925,
+  "num_turns": 39,
+  "tokens": {
+    "input": 47,
+    "output": 44268,
+    "cache_read": 1587479,
+    "cache_creation": 122114,
+    "total": 1753908
+  }
+}
