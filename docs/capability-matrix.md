@@ -113,7 +113,7 @@ restores implicit invocation. A test asserts the emitted payload for that reason
 - **Three of five have never been run against.** Codex, opencode and Cursor wiring is derived from
   their documentation and has not been observed working by the host itself. Vibe's has: its own
   loader accepts the emitted `hooks.toml` in strict mode, asserted by a test that skips where Vibe
-  is absent. opencode's is a half-measure by comparison — the emitted plugin is loaded and its
+  is absent. opencode's is a half-measure by comparison: the emitted plugin is loaded and its
   handlers are called, but by Node, not by opencode.
 - **Mistral Vibe agents are user-global launch profiles**, not project-scoped dispatched
   subagents. Not a like-for-like target, so nothing is emitted.
