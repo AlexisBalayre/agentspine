@@ -41,9 +41,6 @@ describe("the emitted opencode plugin, loaded by Node", () => {
     writeFileSync(path.join(repo, "package.json"), '{ "name": "demo" }\n');
     git("add", "-A");
     git("commit", "-qm", "init");
-    // On the trunk a push is blocked by the branch rule too, so the assertion below would pass
-    // without the force-push rule it names ever being reached.
-    git("checkout", "-q", "-b", "feat/x");
 
     const scaffold = spawnSync(TSX, [CLI, "--dir", repo, "--tools", "opencode", "--yes"], { encoding: "utf8" });
     expect(scaffold.status).toBe(0);
@@ -65,13 +62,15 @@ describe("the emitted opencode plugin, loaded by Node", () => {
     await expect(handlers()).resolves.toBeTypeOf("object");
   });
 
+  // The reason is asserted, not just the throw: the policy has several rules that would block
+  // this command, and a test that accepts any of them stops telling you which one ran.
   it("throws on a command the shared policy blocks, carrying the policy's reason", async () => {
     const hooks = await handlers();
     const call = hooks["tool.execute.before"](
       { tool: "bash" },
       { args: { command: ["git", "push", "--force", "origin", "main"].join(" ") } },
     );
-    await expect(call).rejects.toThrow(/git-safety/);
+    await expect(call).rejects.toThrow(/force push/);
   });
 
   it("lets an ordinary command through", async () => {
