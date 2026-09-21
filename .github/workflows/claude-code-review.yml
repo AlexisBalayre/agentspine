@@ -4,10 +4,11 @@
 #
 # The differences dogfooding requires:
 #
-#   1. The tooling is built from the BASE branch instead of installed from npm. agentspine is not
-#      published yet, and here the review tooling is the very code under review: building the PR's
-#      own src/ would hand untrusted code a job holding the review token. The base branch's copy
-#      has already been reviewed, which is the same argument as the config restore below.
+#   1. The tooling is built from the BASE branch instead of installed from npm. Here the review
+#      tooling is the very code under review, and building the PR's own src/ would hand untrusted
+#      code a job holding the review token. The base branch's copy has already been reviewed,
+#      which is the same argument as the config restore below. A scaffolded repository has no
+#      such conflict, so the shipped template installs the published version instead.
 #   2. Only the repository owner can trigger a run: their own pull requests, or their
 #      `@claude review` comment on anyone's. A run carries the review token, and the model reads
 #      whatever the diff says.

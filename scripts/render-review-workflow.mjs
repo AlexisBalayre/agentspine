@@ -21,10 +21,11 @@ const HEADER = `# This repository's copy of what the ci-review pack emits
 #
 # The differences dogfooding requires:
 #
-#   1. The tooling is built from the BASE branch instead of installed from npm. agentspine is not
-#      published yet, and here the review tooling is the very code under review: building the PR's
-#      own src/ would hand untrusted code a job holding the review token. The base branch's copy
-#      has already been reviewed, which is the same argument as the config restore below.
+#   1. The tooling is built from the BASE branch instead of installed from npm. Here the review
+#      tooling is the very code under review, and building the PR's own src/ would hand untrusted
+#      code a job holding the review token. The base branch's copy has already been reviewed,
+#      which is the same argument as the config restore below. A scaffolded repository has no
+#      such conflict, so the shipped template installs the published version instead.
 #   2. Only the repository owner can trigger a run: their own pull requests, or their
 #      \`@claude review\` comment on anyone's. A run carries the review token, and the model reads
 #      whatever the diff says.
@@ -91,7 +92,7 @@ const TRANSFORMS = [
     /    if: \|\n      \(github\.event_name == 'pull_request' && github\.event\.pull_request\.draft == false\) \|\|\n      \(github\.event_name == 'issue_comment'[^\n]*\n/,
     `${OWNER_GATE}\n`,
   ],
-  // agentspine is unpublished, and here the tooling is the code under review.
+  // Here the tooling is the code under review, so it is built rather than installed.
   [
     /      # --ignore-scripts: the install runs with this job's token in the environment\.\n      - name: Install review tooling\n        run: npm install --global --ignore-scripts "agentspine@\$\{AGENTSPINE_VERSION\}"\n/g,
     TOOLING_STEP,
