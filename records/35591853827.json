@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-21T11:24:03.849Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35591853827",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35591853827",
+  "actor": "AlexisBalayre",
+  "commit_sha": "916ec93409eb9572de38beb0da16862490e14305",
+  "source": "pr",
+  "pr_number": 27,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "incremental",
+  "incremental_from_sha": "faeb529d6d0cf6f28e6e7c2cf3933620c7f32ecd",
+  "prior_importants": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "65-80",
+      "status": "resolved"
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": null,
+      "status": "resolved"
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "40",
+      "status": "resolved"
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "654-655",
+      "status": "resolved"
+    }
+  ],
+  "findings": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "82-107",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "eval-prefix stripping was dropped with no replacement and eval was never added to WRAPPER, so `eval \"git push origin main\"` (and force-push/hard-reset/trunk-push variants) is no longer detected — a regression versus both the immediately-prior commit and the original raw-string policy, and untested by the new test suite.",
+      "body": "**Concern:** Commit 916ec93 removes the previous `eval`-prefix stripping logic without adding `eval` to the `WRAPPER` alternation (`sudo|doas|exec|nohup|command|time|timeout|stdbuf|setsid|nice|ionice|env|xargs`) or to `LEAD`. `shell_commands()` (lines 94-98) never unwraps an `eval \"...\"` invocation, and `GIT_PREFIX` (line 107) requires the literal `git` token to appear after only `LEAD`-recognized words — `eval` is not one of them.\n\nAs a result, `eval \"git push origin main\"`, `eval \"git push -f origin main\"`, and `eval \"git reset --hard\"` all bypass the policy today, even though the string-match predecessor (and the commit immediately before this PR) caught the plain `eval \"git push -f ...\"` case. This is a direct violation of the invariant this same commit states in `docs/design/0001-architecture.md:658-659` — \"the parser must never be more permissive than the string match was\" — and the new test file (`test/claude-code-adapter.test.ts:216-273`) added wrapper/runner/substitution cases but no `eval` case, so the regression shipped untested.\n\n**Fix suggestion:** add `eval` to `WRAPPER` (or unwrap it alongside `unwrap_runners()`, since `eval \"cmd\"` is semantically a runner, not a modifier) and add a regression test mirroring the removed case.\n\nSee <https://github.com/AlexisBalayre/agentspine/blob/916ec93409eb9572de38beb0da16862490e14305/templates/agents/hooks/policies/git-safety.sh#L94-L107>",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "82-85",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "unwrap_runners() only strips an optional leading `sudo` before a runner keyword (bash|sh|zsh|ksh -c); other WRAPPER-list words (exec, nohup, timeout, doas, env, command, time) placed before a runner are not stripped, so e.g. `exec bash -c \"git push -f origin main\"` bypasses detection.",
+      "body": "**Concern:** `unwrap_runners()` (lines 82-85) is:\n```\nsed -E \"s/^[[:space:]]*(sudo[[:space:]]+)?(bash|sh|zsh|ksh)[[:space:]]+-c[[:space:]]+//\"\n```\nOnly `sudo` is special-cased before the runner keyword. Any other `WRAPPER` word (`exec`, `nohup`, `timeout`, `doas`, `env`, `command`, `time`, `stdbuf`, `setsid`, `nice`, `ionice`, `xargs`) placed before `bash -c \"...\"` prevents the sed substitution from matching (the runner keyword isn't at the start of the trimmed line), so the payload is never unwrapped and never re-scanned for an embedded `git` command.\n\nConcretely, `exec bash -c \"git push -f origin main\"` and `nohup sh -c \"git reset --hard\"` are not caught, while the semantically identical `sudo bash -c \"git push -f origin main\"` is. CONTRACT.md's \"Known limitation: reading the line\" section (lines 45-67) documents 4 bypass shapes but does not cover this one, so users are not warned this hole exists.\n\n**Fix suggestion:** generalize the sed to strip any number of leading `LEAD`-matching tokens (or at least any `WRAPPER` word) before the runner keyword, matching the same generality `GIT_PREFIX` already applies to reaching `git` itself.\n\nSee <https://github.com/AlexisBalayre/agentspine/blob/916ec93409eb9572de38beb0da16862490e14305/templates/agents/hooks/policies/git-safety.sh#L82-L85>",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "55-98",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "SUBSTITUTION_BODIES tracks single-quote state as fully opaque but never tracks double-quote state, and is only ever run once against the raw $COMMAND (never re-run against the unwrapped runner payload), so `bash -c '$(git push -f origin main)'` bypasses while the identical double-quoted form `bash -c \"$(git push -f origin main)\"` is caught.",
+      "body": "**Concern:** `SUBSTITUTION_BODIES` (lines 60-76) treats content inside single quotes (`sq` state) as opaque and skips scanning for `` ` `` / `$(` inside it — correct for a real shell, since single quotes suppress substitution. But `shell_commands()` (lines 94-98) runs `SUBSTITUTION_BODIES` only once, against the raw `$COMMAND`, and never re-runs it against the payload after `unwrap_runners()` strips the `bash -c` wrapper and its quotes.\n\nSo for `bash -c '$(git push -f origin main)'`: the outer single quotes around the whole `-c` argument cause `SUBSTITUTION_BODIES`'s single-quote tracking to treat the entire `$(...)` as opaque literal text at the top-level scan (never entering `depth`), and the only extraction pass over the *unwrapped* inner payload is the plain `SPLIT_COMMANDS` pass (line 96), which does not know to strip `$( ... )` around a bare command — so the `git` token is left wrapped in `$(...)ǃ` and doesn't match `GIT_PREFIX`, which requires `git` at the start of a LEAD-prefixed run. The double-quoted form `bash -c \"$(git push -f origin main)\"` is caught only because the outer double quotes don't suppress the top-level scan from seeing the `$(` opener.\n\nThis is an asymmetric, undocumented bug: two payloads that a real shell executes identically are treated differently by the policy.\n\n**Fix suggestion:** re-run `SUBSTITUTION_BODIES` (and `SPLIT_COMMANDS`) against the output of `unwrap_runners()`, not just the raw command, so substitutions nested inside single-quoted runner payloads are extracted the same way double-quoted ones are.\n\nSee <https://github.com/AlexisBalayre/agentspine/blob/916ec93409eb9572de38beb0da16862490e14305/templates/agents/hooks/policies/git-safety.sh#L55-L98>",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "55-59",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The \"Known limitation: reading the line\" bullets don't cover 2 of the 3 confirmed new bypasses (wrapper-then-runner, substitution-inside-single-quoted-runner-payload), so the documented limitation understates the real gap.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": null,
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Recurring em-dash style slip introduced across this diff (0001-architecture.md, CONTRACT.md, README.md, git-safety.sh comments) is inconsistent with the rest of the file's punctuation style in a few spots.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": null,
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "A previously-present explanatory comment on the quote/escape-tracking loop was dropped during the rewrite; the new SPLIT_COMMANDS/SUBSTITUTION_BODIES logic has no equivalent inline explanation of the state machine's invariants.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": null,
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The known-limitation prose is now duplicated near-verbatim between CONTRACT.md and 0001-architecture.md's Decision 27 section; a future edit to one is likely to drift from the other.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "84",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The two quote-stripping sed substitutions in unwrap_runners() (double-quote and single-quote variants) duplicate the same strip-surrounding-quotes pattern; could be one alternation.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "94-98",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "shell_commands() runs two full awk passes over $COMMAND unconditionally (once for SPLIT_COMMANDS, once for SUBSTITUTION_BODIES); on a long line this is a real but minor double-scan cost worth noting even if not worth optimizing now.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "216-273",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new wrapper/runner/substitution test table is internally inconsistent in how it names its helper cases versus the sibling describe blocks elsewhere in the file, making the table slightly harder to scan alongside the rest of the suite.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "40",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Requirements line documents bash/jq/awk/sed but doesn't note the minimum bash version's rationale (3.2, for macOS default compatibility), a gap in an otherwise precise section.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": null,
+      "line": null,
+      "area": "context",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "The broader git-safety policy still relies entirely on lexical command parsing rather than any AST-aware shell parser, which is a known, previously-accepted architectural tradeoff (Decision 27) rather than something this PR introduces or should be expected to fix.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 3,
+  "is_error": false,
+  "cost_usd": 8.993137800000003,
+  "duration_ms": 1285597,
+  "num_turns": 39,
+  "tokens": {
+    "input": 51,
+    "output": 64309,
+    "cache_read": 1773510,
+    "cache_creation": 162643,
+    "total": 2000513
+  }
+}
