@@ -45,14 +45,16 @@ of the only hook whose job is blocking. `awk` and `sed` are POSIX and present wh
 ## Known limitation: reading the line
 
 `git-safety` reads the commands a line would run rather than the line itself. It splits on the
-shell's separators while tracking quotes and backslash escapes, unwraps one level of `bash -c`,
-and collects the body of each command substitution. Each rule then anchors to the start of a
+shell's separators while tracking quotes and backslash escapes, unwraps one level of `bash -c`
+or `eval`, and collects the body of each command substitution, in the line and in an unwrapped
+payload alike. Each rule then anchors to the start of a
 command, so a heredoc, a commit message or a `grep` pattern that merely *names* a forbidden
 command is no longer mistaken for running one.
 
 It is not a shell, and the distance between it and one is where a bypass would live:
 
-- One level of runner unwrapping. A runner inside a runner is read as text.
+- One level of runner unwrapping. A runner inside a runner payload is read as text, though a
+  wrapper in front of a runner is not: `exec bash -c ...` is still read as `bash -c`.
 - Command substitution is not nested: the body of the outer one is read, the inner is not.
 - A wrapper is recognised from a list — `sudo`, `exec`, `nohup`, `timeout`, `env` and the rest
   named in the policy. One outside that list hides the command behind it.

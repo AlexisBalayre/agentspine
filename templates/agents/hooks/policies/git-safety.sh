@@ -75,13 +75,26 @@ SUBSTITUTION_BODIES='
   END { if (body ~ /[^ \t]/) print body }
 '
 
-# A shell runner carries code in its argument. Stripping the runner and the quotes around its
-# payload lets the pass below read that payload as the commands it is. One level only.
+# Words that run another command, and the option or duration tokens that belong to them. A rule
+# naming a subcommand has to see past these, or `sudo git push origin <trunk>` is a push the
+# policy never sees -- which the raw string match, for all its faults, always caught.
+WRAPPER='(sudo|doas|exec|nohup|command|time|timeout|stdbuf|setsid|nice|ionice|env|xargs|eval)'
+LEAD="(${WRAPPER}|-[^[:space:]]+|[0-9]+[smhd]?|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)"
+
+# A shell runner carries code in its argument, and so does `eval`. Stripping the runner and the
+# quotes around its payload lets the pass below read that payload as the commands it is. Any
+# number of wrappers may stand in front of the runner: `exec bash -c ...` is still `bash -c`.
+# One level of unwrapping only.
+#
 # The two quote cases are written out rather than captured and back-referenced, because a
 # backreference is not part of POSIX ERE and BSD sed quietly declines to match one.
 unwrap_runners() {
-  sed -E "s/^[[:space:]]*(sudo[[:space:]]+)?(bash|sh|zsh|ksh)[[:space:]]+-c[[:space:]]+//" \
+  sed -E "s/^[[:space:]]*(${LEAD}[[:space:]]+)*((bash|sh|zsh|ksh)[[:space:]]+-c|eval)[[:space:]]+//" \
     | sed -E "s/^\"(.*)\"[[:space:]]*\$/\\1/; s/^'(.*)'[[:space:]]*\$/\\1/"
+}
+
+unwrapped() {
+  printf '%s' "$COMMAND" | awk -v strip=0 "$SPLIT_COMMANDS" | unwrap_runners
 }
 
 # Everything the line would run, as the rules below read it. The raw string cannot tell running
@@ -91,17 +104,15 @@ unwrap_runners() {
 # Quotes survive the first split and are dropped only by the last, because the middle step
 # unwraps a runner's payload and a pass that had already dropped them would split
 # `sed 's|x|y|'` into commands of its own.
+#
+# Substitutions are collected from the unwrapped payload as well as from the raw line. Single
+# quotes stop the outer shell expanding a substitution, but they do not survive into what a
+# runner is handed: `bash -c '$(...)'` expands inside that runner.
 shell_commands() {
-  printf '%s' "$COMMAND" | awk -v strip=0 "$SPLIT_COMMANDS" | unwrap_runners \
+  unwrapped | awk -v strip=1 "$SPLIT_COMMANDS"
+  { printf '%s' "$COMMAND"; unwrapped; } | awk "$SUBSTITUTION_BODIES" \
     | awk -v strip=1 "$SPLIT_COMMANDS"
-  printf '%s' "$COMMAND" | awk "$SUBSTITUTION_BODIES" | awk -v strip=1 "$SPLIT_COMMANDS"
 }
-
-# Words that run another command, and the option or duration tokens that belong to them. A rule
-# naming a subcommand has to see past these, or `sudo git push origin <trunk>` is a push the
-# policy never sees -- which the raw string match, for all its faults, always caught.
-WRAPPER='(sudo|doas|exec|nohup|command|time|timeout|stdbuf|setsid|nice|ionice|env|xargs)'
-LEAD="(${WRAPPER}|-[^[:space:]]+|[0-9]+[smhd]?|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)"
 # git's own global options sit between `git` and the subcommand: `-C <path>`, `-c <k=v>`,
 # `--no-pager`. Stepping over them is what makes `git -C <worktree> push` visible to a rule.
 GIT_PREFIX="^[[:space:]]*(${LEAD}[[:space:]]+)*git([[:space:]]+(-[Cc][[:space:]]+[^[:space:]]+|--[A-Za-z][A-Za-z0-9-]*(=[^[:space:]]+)?))*[[:space:]]+"

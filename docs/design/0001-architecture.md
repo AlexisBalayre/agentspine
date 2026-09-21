@@ -662,6 +662,13 @@ collected and read as commands -- which closes two holes the string match never 
 table of wrapped commands in `test/claude-code-adapter.test.ts` is what holds the file to the
 rule; it was written by running the old policy and the new one against the same list.
 
+The rule had to be applied twice. A second review pass found the same mistake one level further
+out: the parser had learned about wrappers and about runners but not about one in front of the
+other, so `exec bash -c "..."` walked through, and `eval` had been dropped on the way. Each round
+was found by asking the same question -- what does the blunt version catch that this does not --
+which is the question the table now asks on every run. A parser replacing a string match should
+expect to answer it more than once.
+
 The same change fixed a hole nobody had noticed. Rules looked for the subcommand immediately after
 `git`, so `git -C <path> push origin main` matched nothing and pushed the trunk unchallenged. The
 over-match and the under-match were the same bug seen from two sides: a regex over prose standing

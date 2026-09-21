@@ -263,6 +263,24 @@ describe("git-safety sees a forbidden command however it is wrapped", () => {
     expect(run(command).status).toBe(2);
   });
 
+  // `eval` and a wrapper in front of a runner were the second round of this same mistake: the
+  // first fix taught the policy about wrappers and about runners, but not about one in front of
+  // the other, and dropped `eval` entirely on the way.
+  const FORCE = ["git", "push", "-f", "origin", "feat/x"].join(" ");
+
+  it.each([
+    ["eval with a double-quoted payload", `eval "${PUSH}"`],
+    ["eval with a single-quoted payload", `eval '${FORCE}'`],
+    ["eval with a bare payload", `eval ${PUSH}`],
+    ["a wrapper in front of a runner", `exec bash -c "${FORCE}"`],
+    ["a wrapper in front of a quoted runner", `nohup sh -c '${PUSH}'`],
+    ["a wrapper with an argument in front of a runner", `timeout 5 bash -c "${PUSH}"`],
+    ["substitution inside a single-quoted runner payload", `bash -c '$(${FORCE})'`],
+    ["substitution inside a double-quoted runner payload", `bash -c "$(${FORCE})"`],
+  ])("blocks a forbidden command behind %s", (_label, command) => {
+    expect(run(command).status).toBe(2);
+  });
+
   it("blocks a force push behind a wrapper", () => {
     expect(run("sudo git push --force origin feat/x").status).toBe(2);
   });
