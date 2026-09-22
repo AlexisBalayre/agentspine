@@ -1,6 +1,6 @@
 {
   "name": "agentspine",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "One-shot scaffolder for a shared agent setup across Claude Code, Codex, opencode, Mistral Vibe, and Cursor.",
   "type": "module",
   "license": "MIT",

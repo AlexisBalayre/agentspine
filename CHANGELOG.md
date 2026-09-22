@@ -6,7 +6,7 @@ scaffolded tree — CI gates, contributor tooling, the design record — are not
 The emitted CI review workflow pins the version that scaffolded it, so upgrading a scaffolded
 repository means re-running `npx agentspine`.
 
-## Unreleased
+## 0.1.3 — 2026-09-22
 
 ### Fixed
 
