@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SUPPORTED_TOOLS, detectStacks, detectTools, gitState, hasJq, type Tool } from "./detect.utils.js";
 import { apply, describe, wouldChange } from "./apply.utils.js";
-import { PACKS, buildPlan, type Pack } from "./plan.utils.js";
+import { HOOK_COMMANDS, PACKS, buildPlan, type Pack } from "./plan.utils.js";
 
 const TEMPLATES = fileURLToPath(new URL("../templates", import.meta.url));
 
@@ -191,27 +191,23 @@ type Check = { name: string; ok: boolean; detail: string };
 /** A payload shaped like the host's own, carrying a command git-safety must refuse. */
 const PROBE_COMMAND = ["git", "push", "--force", "origin", "main"].join(" ");
 
-type Probe = { adapter: string; payload: (root: string) => unknown; blocked: (status: number | null, stdout: string) => boolean };
+type Probe = { payload: (root: string) => unknown; blocked: (status: number | null, stdout: string) => boolean };
 
 const PROBES: Partial<Record<Tool, Probe>> = {
   "claude-code": {
-    adapter: "claude-code.sh",
     payload: (root) => ({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd: root, tool_input: { command: PROBE_COMMAND } }),
     blocked: (status) => status === 2,
   },
   codex: {
-    adapter: "codex.sh",
     payload: (root) => ({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd: root, tool_input: { command: PROBE_COMMAND } }),
     blocked: (status) => status === 2,
   },
   cursor: {
-    adapter: "cursor.sh",
     payload: (root) => ({ hook_event_name: "beforeShellExecution", command: PROBE_COMMAND, cwd: root, workspace_roots: [root] }),
     blocked: (status) => status === 2,
   },
   // Vibe denies by exiting 0 and printing a decision, so a zero exit proves nothing here.
   "mistral-vibe": {
-    adapter: "mistral-vibe.sh",
     payload: (root) => ({ hook_event_name: "pre_tool", tool_name: "shell", cwd: root, tool_input: { command: PROBE_COMMAND } }),
     blocked: (status, stdout) => {
       if (status !== 0) return false;
@@ -238,7 +234,8 @@ const WIRING: Record<Tool, { file: string; needle: string }> = {
 };
 
 function doctor(options: Options): number {
-  const root = gitState(options.dir).root ?? options.dir;
+  const git = gitState(options.dir);
+  const root = git.root ?? options.dir;
   // Only tools the project actually uses are checked: reporting a missing plugin for a
   // tool nobody installed trains people to ignore doctor's output.
   const tools = options.tools ?? detectTools(root);
@@ -280,18 +277,22 @@ function doctor(options: Options): number {
     }
     if (!hooksDir || !jq) continue;
 
-    const adapter = path.join(root, ".agents/hooks/adapters", probe.adapter);
     // The only check that matters: a hook that fails to block exits 0 and looks healthy.
-    const result = spawnSync("bash", [adapter, "git-safety"], {
+    // Run the command as wired, not the adapter by path: the wiring is where it breaks, e.g. a
+    // repo-root lookup that resolves to nothing outside a git repository.
+    const command = HOOK_COMMANDS[tool as keyof typeof HOOK_COMMANDS]("git-safety");
+    const result = spawnSync("sh", ["-c", command], {
+      cwd: root,
       input: JSON.stringify(probe.payload(root)),
       encoding: "utf8",
       env: { ...process.env, CLAUDE_PROJECT_DIR: root },
     });
     const blocked = probe.blocked(result.status, result.stdout ?? "");
+    const why = git.isRepo || !command.includes("git rev-parse") ? "" : " (not a git repository, and the wired command needs one)";
     checks.push({
       name: `${tool} blocking`,
       ok: blocked,
-      detail: blocked ? "probe blocked as expected" : "probe was NOT blocked — this hook is not protecting you",
+      detail: blocked ? "probe blocked as expected" : `probe was NOT blocked — this hook is not protecting you${why}`,
     });
   }
 
