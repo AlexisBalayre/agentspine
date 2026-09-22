@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-22T07:53:13.242Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35701109379",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35701109379",
+  "actor": "AlexisBalayre",
+  "commit_sha": "d1a5ddc0200818a184f4be6d823b9fd4d08eee57",
+  "source": "pr",
+  "pr_number": 29,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "src/cli.ts",
+      "line": "273-291",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "HOOK_COMMANDS[tool as keyof typeof HOOK_COMMANDS](\"git-safety\") casts through a type the compiler cannot enforce. HOOK_COMMANDS satisfies Partial<Record<Tool, ...>>, so its inferred type has only the four keys listed, narrower than Tool. Today every tool reaching this line is guaranteed to have an entry because PROBES (guarded by `if (!probe) continue`) happens to list the same four keys by hand — an invariant two developers must remember to keep in sync across src/cli.ts and src/plan.utils.ts, not one the type system enforces. If a future tool is added to PROBES without a matching HOOK_COMMANDS entry, the lookup returns undefined and `spawnSync(\"sh\", [\"-c\", undefined])` throws an unhandled TypeError, crashing doctor instead of producing a graceful FAIL like every other misconfiguration it anticipates. Not reachable with today's four wired tools, so a nit rather than a live defect — but consider deriving PROBES's key domain from HOOK_COMMANDS (e.g. `type ProbedTool = keyof typeof HOOK_COMMANDS`) so the two tables can't drift apart silently.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "104-111",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "doctor's probe now runs each host's exact wired command instead of the adapter by path, so its fidelity for Codex and Cursor rests on wiring assumptions (their real cwd at hook-invocation time) that the matrix already flags as unverified (\"Codex, opencode and Cursor wiring is derived from their documentation and has not been observed working\", lines 109-111). Pre-existing and already disclosed, not introduced by this PR, but worth keeping visible now that doctor exercises those assumptions more directly.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "cost_usd": 4.3259243,
+  "duration_ms": 487720,
+  "num_turns": 22,
+  "tokens": {
+    "input": 27,
+    "output": 25307,
+    "cache_read": 632108,
+    "cache_creation": 81256,
+    "total": 738698
+  }
+}
