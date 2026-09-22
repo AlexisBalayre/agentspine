@@ -107,7 +107,7 @@ const claudeHooks = (hooks: boolean) =>
               hooks: [
                 {
                   type: "command",
-                  command: '"$CLAUDE_PROJECT_DIR"/.agents/hooks/adapters/claude-code.sh git-safety',
+                  command: HOOK_COMMANDS["claude-code"]("git-safety"),
                   timeout: 5,
                 },
               ],
@@ -118,7 +118,7 @@ const claudeHooks = (hooks: boolean) =>
               hooks: [
                 {
                   type: "command",
-                  command: '"$CLAUDE_PROJECT_DIR"/.agents/hooks/adapters/claude-code.sh quality-gate',
+                  command: HOOK_COMMANDS["claude-code"]("quality-gate"),
                   timeout: 300,
                 },
               ],
@@ -131,19 +131,27 @@ const claudeHooks = (hooks: boolean) =>
 
 const REPO_ROOT_CMD = '"$(git rev-parse --show-toplevel)"';
 
+/** Each host's hook command, exactly as wired. doctor runs these, not the adapter by path. */
+export const HOOK_COMMANDS = {
+  "claude-code": (policy: string) => `"$CLAUDE_PROJECT_DIR"/.agents/hooks/adapters/claude-code.sh ${policy}`,
+  codex: (policy: string) => `${REPO_ROOT_CMD}/.agents/hooks/adapters/codex.sh ${policy}`,
+  "mistral-vibe": (policy: string) => `${REPO_ROOT_CMD}/.agents/hooks/adapters/mistral-vibe.sh ${policy}`,
+  cursor: (policy: string) => `./.agents/hooks/adapters/cursor.sh ${policy}`,
+} satisfies Partial<Record<Tool, (policy: string) => string>>;
+
 const codexHooks = `[[hooks.PreToolUse]]
 matcher = "^(Bash|shell)$"
 
 [[hooks.PreToolUse.hooks]]
 type = "command"
-command = '${REPO_ROOT_CMD}/.agents/hooks/adapters/codex.sh git-safety'
+command = '${HOOK_COMMANDS.codex("git-safety")}'
 timeout = 5
 
 [[hooks.Stop]]
 
 [[hooks.Stop.hooks]]
 type = "command"
-command = '${REPO_ROOT_CMD}/.agents/hooks/adapters/codex.sh quality-gate'
+command = '${HOOK_COMMANDS.codex("quality-gate")}'
 timeout = 300`;
 
 // `match` is only valid on tool hooks, so post_agent must omit it.
@@ -151,20 +159,20 @@ const vibeHooks = `[[hooks]]
 name = "agentspine-git-safety"
 type = "pre_tool"
 match = "*"
-command = '${REPO_ROOT_CMD}/.agents/hooks/adapters/mistral-vibe.sh git-safety'
+command = '${HOOK_COMMANDS["mistral-vibe"]("git-safety")}'
 timeout = 5
 
 [[hooks]]
 name = "agentspine-quality-gate"
 type = "post_agent"
-command = '${REPO_ROOT_CMD}/.agents/hooks/adapters/mistral-vibe.sh quality-gate'
+command = '${HOOK_COMMANDS["mistral-vibe"]("quality-gate")}'
 timeout = 300`;
 
 const cursorHooks = {
   version: 1,
   hooks: {
-    beforeShellExecution: [{ command: "./.agents/hooks/adapters/cursor.sh git-safety" }],
-    stop: [{ command: "./.agents/hooks/adapters/cursor.sh quality-gate" }],
+    beforeShellExecution: [{ command: HOOK_COMMANDS.cursor("git-safety") }],
+    stop: [{ command: HOOK_COMMANDS.cursor("quality-gate") }],
   },
 };
 

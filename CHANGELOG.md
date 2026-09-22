@@ -6,6 +6,16 @@ scaffolded tree — CI gates, contributor tooling, the design record — are not
 The emitted CI review workflow pins the version that scaffolded it, so upgrading a scaffolded
 repository means re-running `npx agentspine`.
 
+## Unreleased
+
+### Fixed
+
+- `doctor` reported Codex and Mistral Vibe hooks as blocking in a directory that is not a git
+  repository, where they block nothing. Their wiring finds the adapter through
+  `git rev-parse --show-toplevel`, which resolves to nothing there, but the probe ran the adapter
+  by its absolute path and never exercised that lookup. The probe now runs each host's hook
+  command exactly as wired, from the project root, and says when the missing repository is why.
+
 ## 0.1.2 — 2026-09-21
 
 ### Fixed
