@@ -343,6 +343,14 @@ describe("git-safety reads a heredoc body the way the shell does", () => {
     ["a command after the terminator", `cat > c.toml <<'EOF'\ntext\nEOF\n${FORCE}`],
     ["a body that is never terminated", `cat > c.toml <<'EOF'\n${FORCE}`],
     ["a heredoc marker that is only quoted text", `echo "<<'EOF'"\n${FORCE}\nEOF`],
+    // Review findings on the first version of this parser, each a real bypass it introduced.
+    ["a body fed to a shell behind timeout and its duration", `timeout 30 bash <<'EOF'\n${FORCE}\nEOF`],
+    ["a body fed to a shell behind nice and its priority", `nice -n 5 bash <<'EOF'\n${FORCE}\nEOF`],
+    ["a body fed to a shell behind stdbuf", `stdbuf -oL sh <<'EOF'\n${FORCE}\nEOF`],
+    // Decision 27 accepts this as a cost, and the parser must never be looser than the string
+    // match was: a body line that begins with a forbidden command is still read as one.
+    ["a quoted body line that begins with a forbidden command", `cat > deploy.sh <<'EOF'\n${FORCE}\nEOF`],
+    ["an apostrophe in a body that would otherwise hide the next line", `cat > n.md <<'EOF'\ndon't\n${FORCE}\nEOF`],
   ])("still blocks %s", (_label, command) => {
     expect(run(command).status).toBe(2);
   });
@@ -396,6 +404,9 @@ describe("git-safety follows cd and -C to the checkout a command runs in", () =>
     ["cd into the trunk checkout", (r: string) => `cd ${r} && ${COMMIT}`],
     ["git -C at the trunk checkout", (r: string) => `git -C ${r} ${COMMIT.slice(4)}`],
     ["a push after cd into the trunk checkout", (r: string) => `cd ${r}; ${PUSH}`],
+    // The word only has to appear in the text for a substring match to stop following the cd.
+    ["cd into the trunk checkout with pushd in the message", (r: string) => `cd ${r} && git commit -m "revert pushd change"`],
+    ["a cd written into a quoted body before a cd into the trunk checkout", (r: string) => `cat > n.sh <<'EOF'\ncd /tmp\nEOF\ncd ${r} && ${COMMIT}`],
   ])("blocks %s from a feature worktree", (_label, command) => {
     const { root, tree } = repoWithWorktree();
     expect(run(tree, command(root)).status).toBe(2);
@@ -406,6 +417,7 @@ describe("git-safety follows cd and -C to the checkout a command runs in", () =>
     ["a cd whose target the hook cannot resolve", () => `cd "$SOMEWHERE" && ${COMMIT}`],
     ["a cd to a directory that does not exist", () => `cd /no/such/dir && ${COMMIT}`],
     ["a cd back to the previous directory", (t: string) => `cd ${t} && cd - && ${COMMIT}`],
+    ["a pushd", (t: string) => `pushd ${t} && popd && ${COMMIT}`],
   ])("keeps reading the session's directory after %s", (_label, command) => {
     const { root, tree } = repoWithWorktree();
     expect(run(root, command(tree)).status).toBe(2);

@@ -30,7 +30,8 @@ HARD="--""hard"
 # backslash escapes are tracked, so a separator inside an argument does not end the command and
 # an escaped quote does not end the argument. A newline inside an argument becomes a space,
 # because left as a newline it would reach grep as a line of its own, which is the confusion
-# this exists to remove. With strip=1 the quote characters are dropped as well.
+# this exists to remove. With strip=1 the quote characters are dropped as well. With perline=1
+# every line is split on its own, for heredoc bodies, whose quotes are text the shell never pairs.
 # The $0 below is awk's whole record, so the quotes must stay single.
 # shellcheck disable=SC2016
 SPLIT_COMMANDS='
@@ -47,7 +48,7 @@ SPLIT_COMMANDS='
       if (c == ";" || c == "|" || c == "&") { flush(); continue }
       buf = buf c
     }
-    if (quote == "") flush(); else buf = buf " "
+    if (quote == "" || perline) { flush(); quote = "" } else buf = buf " "
   }
   END { flush() }
 '
@@ -76,25 +77,35 @@ SUBSTITUTION_BODIES='
   END { if (body ~ /[^ \t]/) print body }
 '
 
-# Separates heredoc bodies from the lines around them. want=code prints what the shell runs: every
-# line outside a body, and a body fed to a shell. want=fed prints only the bodies fed to a shell,
-# so they can be read as commands of their own: in place, they may sit inside the quotes of
-# `eval "$(cat <<'EOF' ...)"`, where a split would take them for text. want=expanded prints an
-# unquoted body, which is data but still expands its substitutions. A quoted body (<<'EOF',
-# <<"EOF", <<\EOF) expands nothing and is printed by none of them.
+# Separates heredoc bodies from the lines around them, by what the shell does with each.
+#
+#   want=code      every line outside a body, and every body fed to a shell
+#   want=fed       only the bodies fed to a shell, to be read as commands of their own: in place
+#                  they may sit inside the quotes of `eval "$(cat <<'EOF' ...)"`
+#   want=data      every body not fed to a shell, quoted or not
+#   want=expanded  an unquoted body not fed to a shell, which still expands its substitutions
+#
+# Data bodies are still read as commands, line by line: a heredoc line that begins with a
+# forbidden command is blocked, as it always was. What a quoted data body (<<'EOF', <<"EOF",
+# <<\EOF) loses is only the substitution scan, because the shell expands nothing in it. Data
+# bodies are kept out of want=code so that a `cd` written into a file cannot move where the trunk
+# rule looks.
 #
 # A delimiter is only recognised outside quotes, and inside $( ) where quoting starts afresh:
 # `git commit -m "$(cat <<'EOF' ...)"` is how a multi-line message is usually written. A body
 # with no terminator is printed as code, because guessing that a line is data is the unsafe way
 # to be wrong. Any shell anywhere on the opening line makes that line's bodies code: a heredoc
-# can reach one through a pipe as easily as by redirection.
+# can reach one through a pipe as easily as by redirection. Wrappers in front of the shell are
+# the policy's own LEAD, so `timeout 30 bash <<'EOF'` is a shell like any other.
 # shellcheck disable=SC2016
 HEREDOCS='
   function runs_shell(seg) {
     sub(/^[ \t]*/, "", seg)
-    while (match(seg, /^((sudo|doas|exec|nohup|command|time|env|nice|xargs)[ \t]+|[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+|-[^ \t]+[ \t]+)/))
+    while (seg !~ /^(bash|sh|zsh|ksh|dash|eval|source|\.)([ \t]|$)/) {
+      if (!match(seg, "^" lead "[ \t]+")) return 0
       seg = substr(seg, RLENGTH + 1)
-    return seg ~ /^(bash|sh|zsh|ksh|dash|eval|source|\.)([ \t]|$)/
+    }
+    return 1
   }
   function openers(line,   i, c, q, seg, d, quoted, tabs_, j, rest, depth, shell, first) {
     q = ""; seg = ""; depth = 0; shell = 0; first = n + 1
@@ -135,8 +146,8 @@ HEREDOCS='
     if (shell) for (j = first; j <= n; j++) code[j] = 1
   }
   function emit(l, h) {
-    if (code[h]) { if (want == "code" || want == "fed") print l }
-    else if (!lit[h]) { if (want == "expanded") print l }
+    if (code[h]) { if (want == "code" || want == "fed") print l; return }
+    if (want == "data" || (want == "expanded" && !lit[h])) print l
   }
   {
     if (head) {
@@ -176,9 +187,11 @@ unwrap_runners() {
     | sed -E "s/^\"(.*)\"[[:space:]]*\$/\\1/; s/^'(.*)'[[:space:]]*\$/\\1/"
 }
 
-CODE=$(printf '%s\n' "$COMMAND" | awk -v want=code "$HEREDOCS")
-EXPANDED=$(printf '%s\n' "$COMMAND" | awk -v want=expanded "$HEREDOCS")
-FED=$(printf '%s\n' "$COMMAND" | awk -v want=fed "$HEREDOCS")
+heredocs() { printf '%s\n' "$COMMAND" | awk -v want="$1" -v lead="$LEAD" "$HEREDOCS"; }
+CODE=$(heredocs code)
+EXPANDED=$(heredocs expanded)
+FED=$(heredocs fed)
+DATA=$(heredocs data | awk -v strip=1 -v perline=1 "$SPLIT_COMMANDS")
 SPLIT=$(printf '%s' "$CODE" | awk -v strip=0 "$SPLIT_COMMANDS")
 
 # Everything the line would run, as the rules below read it. The raw string cannot tell running
@@ -203,7 +216,7 @@ SUBSTITUTED=$(printf '%s\n%s\n' "$SUBSTITUTED" "$FED" | awk -v strip=1 "$SPLIT_C
 
 # Computed once. This runs before every shell command the agent makes, and each rule below would
 # otherwise re-run the whole pipeline.
-COMMANDS=$(printf '%s\n%s\n' "$MAIN_COMMANDS" "$SUBSTITUTED")
+COMMANDS=$(printf '%s\n%s\n%s\n' "$MAIN_COMMANDS" "$SUBSTITUTED" "$DATA")
 
 # git's own global options sit between `git` and the subcommand: `-C <path>`, `-c <k=v>`,
 # `--no-pager`. Stepping over them is what makes `git -C <worktree> push` visible to a rule.
@@ -238,8 +251,8 @@ resolve_dir() {
   local target="$2"
   case "$target" in
     '' | - | *'$'* | *'`'* | *'*'* | *'?'*) return 0 ;;
-    '~') target="$HOME" ;;
-    '~/'*) target="$HOME/${target#\~/}" ;;
+    \~) target="$HOME" ;;
+    \~/*) target="$HOME/${target#\~/}" ;;
     /*) ;;
     *) target="$1/$target" ;;
   esac
@@ -269,9 +282,10 @@ git_dir() {
 }
 
 # A cd is followed only through `&&`, `;` and newlines, where it persists into the next command.
-# A subshell, a pipeline, a background job, `||` or an unwrapped runner scopes or conditions it in
-# ways this does not model, so any of them means every command is read against the session's
-# directory, as before. That fallback is the old behaviour, never a looser one.
+# A subshell, a pipeline, a background job, `||` or an unwrapped runner scopes or conditions it
+# in ways this does not model, so any of them means every command is read against the session's
+# directory, as before, and so does every command after a pushd or popd. That fallback is the old
+# behaviour, never a looser one.
 # shellcheck disable=SC2016
 SCOPED='
   {
@@ -289,6 +303,7 @@ SCOPED='
 '
 # bash's own =~ rather than grep per line: this loop runs for every command a line holds.
 IS_CD='^[[:space:]]*cd([[:space:]]|$)'
+IS_DIRSTACK='^[[:space:]]*(pushd|popd)([[:space:]]|$)'
 IS_COMMIT="${GIT_PREFIX}commit([[:space:]]|\$)"
 IS_PUSH="${GIT_PREFIX}push([[:space:]]|\$)"
 
@@ -320,11 +335,13 @@ if [ -n "$PUSHES" ] || [ -n "$(git_runs commit)" ]; then
   FOLLOW_CD=1
   [ "$(printf '%s\n' "$CODE" | awk "$SCOPED")" = 0 ] || FOLLOW_CD=0
   [ "$PAYLOADS" = "$SPLIT" ] || FOLLOW_CD=0
-  case "$CODE" in *pushd* | *popd*) FOLLOW_CD=0 ;; esac
 
   dir="$SESSION_DIR"
   while IFS= read -r line; do
-    if [ "$FOLLOW_CD" = 1 ] && [[ $line =~ $IS_CD ]]; then
+    if [[ $line =~ $IS_DIRSTACK ]]; then
+      FOLLOW_CD=0
+      dir="$SESSION_DIR"
+    elif [ "$FOLLOW_CD" = 1 ] && [[ $line =~ $IS_CD ]]; then
       target="${line#"${line%%[![:space:]]*}"}"
       target="${target#cd}"
       target="${target#"${target%%[![:space:]]*}"}"
@@ -344,6 +361,7 @@ EOF
     fi
   done <<EOF
 $SUBSTITUTED
+$DATA
 EOF
 fi
 
