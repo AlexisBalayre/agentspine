@@ -133,6 +133,11 @@ Two setup steps, both in the comment at the top of the emitted workflow: add the
 `CLAUDE_CODE_OAUTH_TOKEN` secret, and create the `ci/review-metrics` orphan branch that stores each
 run's record for `review-retro` to mine.
 
+Only the repository's owner, members of its organisation and invited collaborators can start a
+review, whether by opening a PR or by commenting `@claude review`. GitHub records that
+association without a permission level, so a read-only collaborator counts. A push to a PR only
+triggers a review when the PR's author pushed it.
+
 GitHub and Claude Code only, because it runs through `anthropics/claude-code-action`. On any other
 host, `review-changes` reviews the same six areas locally.
 

@@ -37,9 +37,19 @@ env:
 
 jobs:
   claude-review:
+    # Only the repository's owner, members of the organisation that owns it, and invited
+    # collaborators trigger a run, since a run carries the review token and the model reads
+    # whatever the diff says. `author_association` does not carry a permission level: a read-only
+    # collaborator passes. On pull_request the actor must also be the author, because a push by
+    # anyone else to that branch fires `synchronize` and the author check alone would pass it.
+    # To review someone else's PR, comment `@claude review` on it.
     if: |
-      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude review'))
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) &&
+        github.actor == github.event.pull_request.user.login) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+        contains(github.event.comment.body, '@claude review') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     # Generous headroom: a run cancelled at the timeout is a fully billed review
     # discarded for want of a few minutes.

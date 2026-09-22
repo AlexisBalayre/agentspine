@@ -15,6 +15,11 @@ repository means re-running `npx agentspine`.
   `git rev-parse --show-toplevel`, which resolves to nothing there, but the probe ran the adapter
   by its absolute path and never exercised that lookup. The probe now runs each host's hook
   command exactly as wired, from the project root, and says when the missing repository is why.
+- The emitted review workflow ran for anyone: any PR opened against the repository, and any
+  `@claude review` comment, started a run holding the review token with the model reading the
+  diff. Both triggers now require the author to be the repository's owner, a member of its
+  organisation, or an invited collaborator. A push to a PR triggers a review only when the PR's
+  author made it, so someone else pushing to a trusted author's branch cannot start one.
 
 ## 0.1.2 — 2026-09-21
 
