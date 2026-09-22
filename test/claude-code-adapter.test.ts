@@ -289,3 +289,125 @@ describe("git-safety sees a forbidden command however it is wrapped", () => {
     expect(run(["sudo", "git", "reset", "--hard", "HEAD~1"].join(" ")).status).toBe(2);
   });
 });
+
+/**
+ * A quoted heredoc delimiter makes the body literal: the shell expands nothing in it. Scanning that
+ * body for substitutions blocked a config file whose comment named a force push in backticks. An
+ * unquoted body still expands its substitutions, and a body fed to a shell is code, so both stay
+ * under the rules.
+ */
+describe("git-safety reads a heredoc body the way the shell does", () => {
+  function repo() {
+    const root = mkdtempSync(path.join(tmpdir(), "agentspine-heredoc-"));
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
+    git("init", "-q", "-b", "main");
+    writeFileSync(path.join(root, "a.txt"), "x\n");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+    git("checkout", "-q", "-b", "feat/x");
+    return root;
+  }
+
+  const run = (command: string) => {
+    const root = repo();
+    return spawnSync("bash", [ADAPTER, "git-safety"], {
+      input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd: root, tool_input: { command } }),
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+  };
+
+  const FORCE = ["git", "push", "--force", "origin", "feat/x"].join(" ");
+  const TICKED = "`" + FORCE + "`";
+
+  it.each([
+    ["a single-quoted delimiter", `cat > c.toml <<'EOF'\n# would allow ${TICKED}\nEOF`],
+    ["a double-quoted delimiter", `cat > c.toml <<"EOF"\n# would allow ${TICKED}\nEOF`],
+    ["a backslash-quoted delimiter", `cat > c.toml <<\\EOF\n# would allow $(${FORCE})\nEOF`],
+    ["a tab-stripping quoted delimiter", `cat > c.toml <<-'EOF'\n\t# would allow ${TICKED}\n\tEOF`],
+    ["a quoted heredoc followed by a harmless command", `cat > c.toml <<'EOF'\n${TICKED}\nEOF\nls`],
+    ["a commit message written through $(cat <<'EOF')", `git commit -m "$(cat <<'EOF'\nstop ${TICKED}\nEOF\n)"`],
+  ])("allows a literal body behind %s", (_label, command) => {
+    expect(run(command).status).toBe(0);
+  });
+
+  it.each([
+    ["an unquoted body, which expands substitutions", `cat > c.toml <<EOF\n# $(${FORCE})\nEOF`],
+    ["an unquoted body with backticks", `cat > c.toml <<EOF\n${TICKED}\nEOF`],
+    ["a quoted body fed to bash", `bash <<'EOF'\n${FORCE}\nEOF`],
+    ["an unquoted body fed to sh", `sh -s <<EOF\n${FORCE}\nEOF`],
+    ["a body fed to a wrapped shell", `sudo bash <<'EOF'\n${FORCE}\nEOF`],
+    ["a quoted body piped into a shell", `cat <<'EOF' | sh\n${FORCE}\nEOF`],
+    ["a quoted body handed to eval", `eval "$(cat <<'EOF'\n${FORCE}\nEOF\n)"`],
+    ["a command after the terminator", `cat > c.toml <<'EOF'\ntext\nEOF\n${FORCE}`],
+    ["a body that is never terminated", `cat > c.toml <<'EOF'\n${FORCE}`],
+    ["a heredoc marker that is only quoted text", `echo "<<'EOF'"\n${FORCE}\nEOF`],
+  ])("still blocks %s", (_label, command) => {
+    expect(run(command).status).toBe(2);
+  });
+});
+
+/**
+ * The trunk rule reads the branch where each git command runs. A `cd` or a `git -C` moves that,
+ * and reading the session's own directory instead blocked a commit on a feature branch in another
+ * repository, while letting `git -C <trunk checkout> commit` through from a worktree.
+ */
+describe("git-safety follows cd and -C to the checkout a command runs in", () => {
+  function repoWithWorktree() {
+    const root = mkdtempSync(path.join(tmpdir(), "agentspine-cd-"));
+    const git = (cwd: string, ...args: string[]) =>
+      spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd, encoding: "utf8" });
+    git(root, "init", "-q", "-b", "main");
+    writeFileSync(path.join(root, "a.txt"), "x\n");
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "init");
+    const tree = path.join(root, ".worktrees", "feature");
+    git(root, "worktree", "add", "-q", tree, "-b", "feat/thing");
+    return { root, tree };
+  }
+
+  const run = (cwd: string, command: string) =>
+    spawnSync("bash", [ADAPTER, "git-safety"], {
+      input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd, tool_input: { command } }),
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: cwd },
+    });
+
+  const COMMIT = ["git", "commit", "-m", "work"].join(" ");
+  const PUSH = ["git", "push"].join(" ");
+
+  it("allows a commit after cd into a checkout on a feature branch", () => {
+    const { root, tree } = repoWithWorktree();
+    expect(run(root, `cd ${tree} && ${COMMIT}`).status).toBe(0);
+  });
+
+  it("allows a commit after a relative cd", () => {
+    const { root } = repoWithWorktree();
+    expect(run(root, `cd .worktrees/feature && ${COMMIT}`).status).toBe(0);
+  });
+
+  it("allows git -C pointed at a feature branch", () => {
+    const { root, tree } = repoWithWorktree();
+    expect(run(root, `git -C ${tree} ${COMMIT.slice(4)}`).status).toBe(0);
+  });
+
+  it.each([
+    ["cd into the trunk checkout", (r: string) => `cd ${r} && ${COMMIT}`],
+    ["git -C at the trunk checkout", (r: string) => `git -C ${r} ${COMMIT.slice(4)}`],
+    ["a push after cd into the trunk checkout", (r: string) => `cd ${r}; ${PUSH}`],
+  ])("blocks %s from a feature worktree", (_label, command) => {
+    const { root, tree } = repoWithWorktree();
+    expect(run(tree, command(root)).status).toBe(2);
+  });
+
+  it.each([
+    ["a cd inside a subshell", (t: string) => `(cd ${t} && true); ${COMMIT}`],
+    ["a cd whose target the hook cannot resolve", () => `cd "$SOMEWHERE" && ${COMMIT}`],
+    ["a cd to a directory that does not exist", () => `cd /no/such/dir && ${COMMIT}`],
+    ["a cd back to the previous directory", (t: string) => `cd ${t} && cd - && ${COMMIT}`],
+  ])("keeps reading the session's directory after %s", (_label, command) => {
+    const { root, tree } = repoWithWorktree();
+    expect(run(root, command(tree)).status).toBe(2);
+  });
+});
