@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-22T12:20:27.568Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35726352282",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35726352282",
+  "actor": "AlexisBalayre",
+  "commit_sha": "aa3b50594a4e3ab46f3cf0faa78f8b62be3767be",
+  "source": "pr",
+  "pr_number": 32,
+  "action": "review",
+  "reviewers_spawned": [
+    "conventions"
+  ],
+  "reviewers_skipped": [
+    "correctness",
+    "security",
+    "context",
+    "maintainability",
+    "docs"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "cost_usd": 0.51118545,
+  "duration_ms": 93238,
+  "num_turns": 10,
+  "tokens": {
+    "input": 15,
+    "output": 5432,
+    "cache_read": 252836,
+    "cache_creation": 43963,
+    "total": 302246
+  }
+}
