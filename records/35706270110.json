@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-22T09:01:56.562Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35706270110",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35706270110",
+  "actor": "AlexisBalayre",
+  "commit_sha": "6d9e58cc6ef032dbb9b9bc0dbfdc4e7e32ef7222",
+  "source": "pr",
+  "pr_number": 31,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "context"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "93-97 (function), 164 (WRAPPER)",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "runs_shell() (new HEREDOCS pass) recognizes a narrower wrapper-word list than the file's own WRAPPER macro, so a heredoc opened behind timeout/stdbuf/setsid/ionice (or nice with an argument) is misclassified as literal data and its body is never scanned by any rule.",
+      "body": "`runs_shell()`, the new function that decides whether a heredoc body is fed to a shell (and therefore still scanned as code), only strips this prefix list before checking for a shell name:\n\n```awk\nwhile (match(seg, /^((sudo|doas|exec|nohup|command|time|env|nice|xargs)[ \\t]+|[A-Za-z_][A-Za-z0-9_]*=[^ \\t]*[ \\t]+|-[^ \\t]+[ \\t]+)/))\n  seg = substr(seg, RLENGTH + 1)\nreturn seg ~ /^(bash|sh|zsh|ksh|dash|eval|source|\\.)([ \\t]|$)/\n```\n\nThe file's own `WRAPPER` macro, used everywhere else a wrapper needs recognizing, is wider:\n\n```\nWRAPPER='(sudo|doas|exec|nohup|command|time|timeout|stdbuf|setsid|nice|ionice|env|xargs|eval)'\n```\n\n`runs_shell` is missing `timeout`, `stdbuf`, `setsid`, `ionice`, and has no way to consume a bare numeric argument (so even `nice -n 5 bash` fails — `nice` strips, `-n` strips as a flag, but the bare `5` left over matches nothing and the loop stops).\n\nConcretely, this heredoc is never scanned and the force push inside it runs unblocked:\n\n```bash\ntimeout 30 bash <<'EOF'\ngit push --force origin main\nEOF\n```\n\nTraced end to end: `openers()` never sets `shell=1` for this opener line, so `code[1]=0`; the delimiter is quoted so `lit[1]=1`; `emit()`'s two branches (`if (code[h])` / `else if (!lit[h])`) are both false, so the body is printed under none of `want=code`, `want=fed`, or `want=expanded`. Every downstream variable (`CODE`, `EXPANDED`, `FED`, and therefore `COMMANDS`) is built exclusively from these three, so the push is invisible to `git_runs push` and the `--force` check never runs. This is exactly the shape of bug decision 27 in `docs/design/0001-architecture.md` warns against (\"the parser must never be more permissive than the string match was\") — the pre-PR code, which read every heredoc line as raw text via `SPLIT_COMMANDS`, did catch this same input.\n\nFix direction: have `runs_shell` reuse `WRAPPER` (already in scope before `HEREDOCS` is invoked) instead of a hand-duplicated list, e.g. by building the regex with `-v wrapper=\"$WRAPPER\"`.\n\n<https://github.com/AlexisBalayre/agentspine/blob/6d9e58cc6ef032dbb9b9bc0dbfdc4e7e32ef7222/templates/agents/hooks/policies/git-safety.sh#L93-L97>",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "323",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The FOLLOW_CD kill-switch matches the literal substrings \"pushd\"/\"popd\" anywhere in the whole command text (including inside quoted arguments like a commit message), so any commit message, path, or grep pattern that happens to contain those letters silently disables cd-tracking and lets a commit/push on the actual trunk checkout through.",
+      "body": "`FOLLOW_CD` is disabled by this check, applied to `$CODE` (the reconstructed command text, quotes and all):\n\n```bash\ncase \"$CODE\" in *pushd* | *popd*) FOLLOW_CD=0 ;; esac\n```\n\nBash `case` patterns are plain globs with no quote-awareness, so `*pushd*` matches the substring \"pushd\" wherever it occurs in `$CODE` — including inside a quoted commit message, a file path, or a grep pattern that has nothing to do with the `pushd` builtin. Reproduction, run from a feature worktree with `/tmp/trunk` a checkout on the trunk branch:\n\n```bash\ncd /tmp/trunk && git commit --allow-empty -m \"revert pushd change\"\n```\n\nThe PR's own new test asserts `cd <trunk checkout> && git commit` is blocked from a feature worktree (`test/claude-code-adapter.test.ts:397-402`). Here it isn't: `$CODE` contains the literal string \"revert pushd change\", the `case` matches, `FOLLOW_CD` is set to 0, the `cd` step is never tracked by the loop, and `check_trunk` runs against `$SESSION_DIR` (the feature worktree) instead of the checkout the commit actually lands in. The commit executes on the trunk, on `/tmp/trunk`, unblocked.\n\nFix direction: match only a leading `pushd`/`popd` token per parsed command line (e.g. inside the tracking loop, against `$MAIN_COMMANDS`) rather than a substring of the whole raw `$CODE` blob.\n\n<https://github.com/AlexisBalayre/agentspine/blob/6d9e58cc6ef032dbb9b9bc0dbfdc4e7e32ef7222/templates/agents/hooks/policies/git-safety.sh#L323>",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "137-139",
+      "area": "conventions",
+      "confidence": "high",
+      "tag": "important",
+      "description": "A quoted heredoc body that names a forbidden command as plain text (no backticks/$(), not fed to a shell) is now dropped entirely and never scanned by any rule, which is more permissive than both the pre-PR parser and the pre-decision-27 raw string match — violating the ADR's own binding rule and leaving CONTRACT.md's documented limitation inaccurate.",
+      "body": "`docs/design/0001-architecture.md` decision 27 states the rule any change to this file must hold: **\"the parser must never be more permissive than the string match was.\"** The same decision explicitly names, as an already-accepted cost, that \"a line of a heredoc that begins with a forbidden command is still read as that command\" — mirrored in `.agents/hooks/CONTRACT.md:61`: \"A heredoc line that *begins* with a forbidden command is still read as that command.\"\n\n`emit()`, the new function that decides what a heredoc body is printed as:\n\n```awk\nfunction emit(l, h) {\n  if (code[h]) { if (want == \"code\" || want == \"fed\") print l }\n  else if (!lit[h]) { if (want == \"expanded\") print l }\n}\n```\n\nonly prints a body line when it's fed to a shell (`code[h]`), or, for `want=expanded`, when it's unquoted (`!lit[h]`). A quoted, not-fed body — e.g.\n\n```bash\ncat > deploy.sh <<'EOF'\ngit push --force origin main\nEOF\n```\n\n— has `code[h]=0` and `lit[h]=1`, so it is printed under none of `want=code`/`fed`/`expanded`. It never enters `CODE`, `EXPANDED`, or `FED`, and therefore never reaches `$COMMANDS`; `git_runs push` never sees it. The pre-PR parser, which fed the raw multi-line `$COMMAND` through `SPLIT_COMMANDS` with no heredoc awareness, flushed this line as its own command and did block it — matching what a raw string match (the pre-decision-27 baseline) would also have caught. This PR's own \"still blocks\" test table only covers substitution-wrapped or fed-to-shell bodies, never a bare non-substitution command line in a quoted, unfed heredoc, so the narrowing is untested and no new ADR decision records it as an intentional change.\n\n<https://github.com/AlexisBalayre/agentspine/blob/6d9e58cc6ef032dbb9b9bc0dbfdc4e7e32ef7222/templates/agents/hooks/policies/git-safety.sh#L137-L139>",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "83-84",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The HEREDOCS block comment's closing sentence (\"A quoted body ... expands nothing and is printed by none of them\") contradicts the two sentences immediately before it, which already carve out bodies fed to a shell as being printed by want=code/want=fed regardless of quoting — exactly the case the PR's own new tests for a quoted body fed to bash/piped/eval rely on.",
+      "body": "The comment above the `HEREDOCS` awk block reads, in full:\n\n> want=code prints what the shell runs: every line outside a body, and a body fed to a shell. want=fed prints only the bodies fed to a shell... want=expanded prints an unquoted body, which is data but still expands its substitutions. **A quoted body (`<<'EOF'`, `<<\"EOF\"`, `<<\\EOF`) expands nothing and is printed by none of them.**\n\nRead as a whole, the closing sentence generalizes over all three `want` modes just named — but the first two sentences already state that `want=code` and `want=fed` print a body **fed to a shell**, with no mention of quoting as a disqualifier. And indeed, `emit()` gates on `code[h]` (fed) independently of `lit[h]` (quoted):\n\n```awk\nif (code[h]) { if (want == \"code\" || want == \"fed\") print l }\n```\n\nSo a quoted-and-fed heredoc — `bash <<'EOF'`, `cat <<'EOF' | sh`, `eval \"$(cat <<'EOF' ...)\"` — **is** printed under `want=code`/`want=fed`, which is exactly the mechanism the PR's own new tests (\"a quoted body fed to bash\", \"a quoted body piped into a shell\", \"a quoted body handed to eval\", all asserting `status 2`) exercise. A maintainer reading only the closing sentence could reasonably conclude quoted heredocs are always inert to this hook — the opposite of what the surrounding code and tests establish, in a comment documenting a security-relevant parser.\n\nSuggested fix: qualify the closing sentence, e.g. \"A quoted body that is not fed to a shell expands nothing and is printed by none of them.\"\n\n<https://github.com/AlexisBalayre/agentspine/blob/6d9e58cc6ef032dbb9b9bc0dbfdc4e7e32ef7222/templates/agents/hooks/policies/git-safety.sh#L83-L84>",
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "61",
+      "area": "conventions",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "CONTRACT.md's known-limitation bullet (\"A heredoc line that begins with a forbidden command is still read as that command\") is now stale for a quoted, not-fed heredoc body that isn't wrapped in a command substitution — this PR changes exactly that case (see the emit()/HEREDOCS narrowing finding) but doesn't update the doc that describes it.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "198-202",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "SUBSTITUTED is assigned twice with two different data shapes (unsplit substitution-body text, then reassigned to the split-and-stripped command list), which — combined with CODE/EXPANDED/FED/SPLIT/PAYLOADS/MAIN_COMMANDS/COMMANDS all threading through the same ~30 lines — makes the pipeline harder to trace than if the intermediate stage had its own name.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "320-323",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "FOLLOW_CD's `[ \"$PAYLOADS\" = \"$SPLIT\" ]` gate is an indirect proxy for \"no runner was present\" (true only when unwrap_runners changed nothing); the block comment above explains the why but doesn't tie it to this specific equality check, so a future maintainer needs to already know PAYLOADS = unwrap_runners(SPLIT) to see why equality means no runner.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "330; 342",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "Both commit/push-scanning loops re-test the identical `[[ $line =~ $IS_COMMIT ]] || [[ $line =~ $IS_PUSH ]]` predicate before calling check_trunk; the loops themselves differ justifiably (one tracks cd, one always uses SESSION_DIR) but the duplicated classification check isn't factored into a shared helper, so the two copies could drift if IS_COMMIT/IS_PUSH handling ever needs a third case.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "300; 357",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The new heredoc-tests and cd/-C-tests describe blocks each re-implement a fixture helper (repo(), repoWithWorktree()) that is byte-identical to one already defined earlier in the same file for a pre-existing describe block, unlike the file's other per-describe fixtures which genuinely differ in setup — the obvious move is hoisting one shared helper each.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "271-274",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The SCOPED comment's list of cases that fall back to the session's directory (\"a subshell, a pipeline, a background job, || or an unwrapped runner\") omits the sixth actual carve-out, the pushd/popd case at line 323, so a maintainer relying on the comment as exhaustive would miss it; the same omission is echoed in CHANGELOG.md:33.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 4,
+  "is_error": false,
+  "cost_usd": 10.001500149999996,
+  "duration_ms": 1109611,
+  "num_turns": 42,
+  "tokens": {
+    "input": 59,
+    "output": 54154,
+    "cache_read": 2067206,
+    "cache_creation": 116486,
+    "total": 2237905
+  }
+}
