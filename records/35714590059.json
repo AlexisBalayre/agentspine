@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-22T10:25:30.510Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35714590059",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35714590059",
+  "actor": "AlexisBalayre",
+  "commit_sha": "a21e1a3498b8952a6c7cf1a1d59e848142134cf7",
+  "source": "pr",
+  "pr_number": 31,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "context"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "6d9e58cc6ef032dbb9b9bc0dbfdc4e7e32ef7222",
+  "prior_importants": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "93-97 (function), 164 (WRAPPER)",
+      "status": "resolved"
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "323",
+      "status": "resolved"
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "137-139",
+      "status": "resolved"
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "83-84",
+      "status": "resolved"
+    }
+  ],
+  "findings": [
+    {
+      "file": "templates/agents/hooks/CONTRACT.md",
+      "line": "66",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The new trunk-rule bullet added by this delta lists pushd as a fallback trigger for reading the session's directory but omits popd, even though the code (IS_DIRSTACK='^[[:space:]]*(pushd|popd)([[:space:]]|$)') and the adjacent SCOPED comment in git-safety.sh (also revised in this commit, 'so does every command after a pushd or popd') treat them identically.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "216",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Folding the new DATA stream into COMMANDS (fixing the prior permissiveness regression) means an agent on trunk that writes a shell/CI script whose heredoc body lines begin with `git commit`/`git push` is now blocked, where the immediately-prior commit (6d9e58c) allowed it. This is intentional per ADR decision 27 and locked by a new test, but worth reviewer awareness as a behavioral tightening, not a defect.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "193; 219",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new DATA variable adds a third source feeding the already dense CODE/EXPANDED/FED/SPLIT/PAYLOADS/MAIN_COMMANDS/SUBSTITUTED/COMMANDS pipeline (a pre-existing density issue from the prior round), threaded into both COMMANDS and a second while-loop's heredoc input.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "375",
+      "area": "security",
+      "confidence": "high",
+      "tag": "pre-existing",
+      "description": "The trunk-refspec grep `[[:space:]]$TRUNK([[:space:]]|$)` requires whitespace-or-end right after the trunk name, so `(cd <trunk checkout> && git push origin main)` reaches it as `...main)` and the `)` fails the boundary, letting a subshell-wrapped push to trunk skip the refspec check (cd-tracking is separately disabled by SCOPED noticing the `(`, so the branch check also falls back to the session directory). Present identically in the merge-base file (6e26bd5), not introduced by this PR.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "RESTORE_PATHS for this repo's review workflow is \"AGENTS.md .agents templates\" (templates/ is included because .agents/ symlinks into it), but the .claude-pr/ snapshot this run only contained CLAUDE.md and .claude/ -- no templates/ copy was preserved there, even though the working tree's templates/ was in fact restored to the merge-base version (confirmed: templates/agents/hooks/policies/git-safety.sh and CONTRACT.md on disk were the pre-PR versions). The documented fallback (\"Read .claude-pr/<path>\" for the PR's real content) was therefore unavailable for the two files this PR actually changes; reviewers had to be redirected to `git show <head-sha>:<path>` instead, which worked but is a workaround the skill's instructions don't describe for this gap."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "cost_usd": 7.228485499999997,
+  "duration_ms": 815602,
+  "num_turns": 36,
+  "tokens": {
+    "input": 57,
+    "output": 33311,
+    "cache_read": 1696973,
+    "cache_creation": 115299,
+    "total": 1845640
+  }
+}
