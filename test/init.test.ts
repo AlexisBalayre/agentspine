@@ -167,6 +167,20 @@ describe("doctor probes every adapter it can", () => {
   });
 });
 
+describe("doctor outside a git repository", () => {
+  // The Codex and Vibe wiring locates the repo root with git, so outside a repository the host
+  // runs a path that does not exist and blocks nothing, however healthy the adapter is.
+  it("fails the probe for wiring that needs a repo root", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "agentspine-nogit-"));
+    runCli(["--dir", dir, "--tools", "mistral-vibe,codex,claude-code", "--yes"]);
+    const { status, stdout } = runCli(["doctor", "--dir", dir, "--tools", "mistral-vibe,codex,claude-code"]);
+    expect(status).toBe(1);
+    expect(stdout).toMatch(/FAIL\s+mistral-vibe blocking.*not a git repository/);
+    expect(stdout).toMatch(/FAIL\s+codex blocking.*not a git repository/);
+    expect(stdout).toMatch(/ok\s+claude-code blocking/);
+  });
+});
+
 describe("skill packs", () => {
   it("installs no pack by default, only the skill that adapts the setup to the project", () => {
     runCli(["--dir", repo, "--yes"]);
