@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-22T07:56:38.491Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "35701488057",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/35701488057",
+  "actor": "AlexisBalayre",
+  "commit_sha": "78de4f4f7d08db24d53ef89d1775df06f19b732c",
+  "source": "pr",
+  "pr_number": 30,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "context",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "47-49",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The github.actor == pull_request.user.login check applies to all pull_request sub-events (opened, ready_for_review, synchronize), but the adjacent comment justifies it only for synchronize (\"a push by anyone else to that branch fires synchronize\"). For ready_for_review specifically, a trusted maintainer other than the PR author marking another trusted author's draft ready has github.actor != pull_request.user.login, so the pull_request-triggered path is skipped (the @claude review comment path still works). This fails closed, not open, so it's not a security gap, but the implementation is broader than the stated rationale covers.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "54-56",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Same actor-equality broadening as in the emitted template applies to this repo's dogfood OWNER_GATE (github.actor == github.repository_owner on the pull_request leg), for the same reason: it's applied to all pull_request sub-events though the rationale only covers synchronize.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "48, 52",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "fromJSON('[\"OWNER\", \"MEMBER\", \"COLLABORATOR\"]') is repeated verbatim in both branches of the same if: expression. Not actionable today since GitHub Actions' env context isn't available in job-level if: conditions, and the two sites are 4 lines apart so edit drift is unlikely, but flagging for visibility if the trust list ever needs to change.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "This run's config-restore step replaced templates/ with the merge-base's copy (per RESTORE_PATHS in .github/workflows/claude-code-review.yml) but did not save a pre-restore snapshot to .claude-pr/templates/, unlike CLAUDE.md and .claude/settings.json which were preserved there. Reviewers had to be briefed to use git diff/gh pr diff instead of Read for templates/github/workflows/claude-code-review.yml. Did not block the review since the diff commands are authoritative regardless, but worth checking whether the 'Restore startup config from base' step's cp -R is actually running for every RESTORE_PATHS entry."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "cost_usd": 3.489198750000001,
+  "duration_ms": 416418,
+  "num_turns": 23,
+  "tokens": {
+    "input": 33,
+    "output": 25353,
+    "cache_read": 892603,
+    "cache_creation": 70591,
+    "total": 988580
+  }
+}
