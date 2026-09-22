@@ -23,9 +23,24 @@ describe("the repo's review workflow", () => {
     expect(committed).not.toContain("npm install --global");
     // Only the owner triggers a run, and only once the switch is on.
     expect(committed).toContain("github.event.pull_request.user.login == github.repository_owner");
+    expect(committed).toContain("github.actor == github.repository_owner");
+    expect(committed).toContain("github.event.comment.user.login == github.repository_owner");
     expect(committed).toContain("vars.CLAUDE_REVIEW_ENABLED == 'true'");
     // `.agents/` is a symlink into templates/, so the target is startup config too.
     expect(committed).toContain('RESTORE_PATHS: "AGENTS.md .agents templates"');
+  });
+});
+
+describe("the emitted review workflow", () => {
+  // A run carries the review token and the model reads whatever the diff says, so an outsider's
+  // PR or comment must not start one.
+  it("admits only the repository's owner, members and collaborators, on both triggers", () => {
+    const template = readFileSync(path.resolve("templates/github/workflows/claude-code-review.yml"), "utf8");
+    const trusted = `contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),`;
+    expect(template).toContain(`${trusted} github.event.pull_request.author_association)`);
+    expect(template).toContain(`${trusted} github.event.comment.author_association)`);
+    // A push by someone else to a trusted author's branch fires synchronize too.
+    expect(template).toContain("github.actor == github.event.pull_request.user.login");
   });
 });
 

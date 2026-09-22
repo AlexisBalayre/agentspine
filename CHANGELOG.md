@@ -6,6 +6,16 @@ scaffolded tree — CI gates, contributor tooling, the design record — are not
 The emitted CI review workflow pins the version that scaffolded it, so upgrading a scaffolded
 repository means re-running `npx agentspine`.
 
+## Unreleased
+
+### Fixed
+
+- The emitted review workflow ran for anyone: any PR opened against the repository, and any
+  `@claude review` comment, started a run holding the review token with the model reading the
+  diff. Both triggers now require the author to be the repository's owner, a member of its
+  organisation, or an invited collaborator. A push to a PR triggers a review only when the PR's
+  author made it, so someone else pushing to a trusted author's branch cannot start one.
+
 ## 0.1.2 — 2026-09-21
 
 ### Fixed
