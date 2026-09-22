@@ -58,7 +58,13 @@ It is not a shell, and the distance between it and one is where a bypass would l
 - Command substitution is not nested: the body of the outer one is read, the inner is not.
 - A wrapper is recognised from a list — `sudo`, `exec`, `nohup`, `timeout`, `env` and the rest
   named in the policy. One outside that list hides the command behind it.
-- A heredoc line that *begins* with a forbidden command is still read as that command.
+- A heredoc line that *begins* with a forbidden command is still read as that command. A quoted
+  heredoc body (`<<'EOF'`) is not scanned for command substitutions, because the shell expands
+  none there; an unquoted one is. A body fed to a shell, by redirection, pipe or `eval`, is read
+  as commands in full.
+- The trunk rule follows `cd` through `&&`, `;` and newlines, and `git -C`, to the checkout a
+  commit or push runs in. Behind a subshell, a pipeline, `||`, a runner, `pushd`, or a target it
+  cannot resolve, it reads the session's directory instead.
 
 What this replaced matched patterns against the raw text, so every mention of a command was a
 block. That was documented here as deliberate, on the grounds that a parser disagreeing with the

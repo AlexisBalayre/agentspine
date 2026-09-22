@@ -20,6 +20,19 @@ repository means re-running `npx agentspine`.
   diff. Both triggers now require the author to be the repository's owner, a member of its
   organisation, or an invited collaborator. A push to a PR triggers a review only when the PR's
   author made it, so someone else pushing to a trusted author's branch cannot start one.
+- The `git-safety` hook read a quoted heredoc's body for command substitutions, although the
+  shell expands nothing there. A file written through `cat <<'EOF'` whose text named a forbidden
+  command in backticks was blocked as though the command had run. A quoted body is no longer
+  scanned for substitutions; its lines are still read as commands, so one that begins with a
+  forbidden command is blocked as before. An unquoted body is still scanned, and a body fed to a
+  shell, by redirection, pipe or `eval`, is read as commands in full. That last case was never
+  caught before when the heredoc sat inside `eval "$(...)"`.
+- The `git-safety` trunk rule read the branch of the session's directory, whatever the command
+  did first. `cd <other checkout> && git commit` was blocked when the session sat on the trunk,
+  and `git -C <trunk checkout> commit` was allowed from a feature worktree. The rule now follows
+  `cd` through `&&`, `;` and newlines, and `-C` on each git command, to the checkout the commit or
+  push runs in. Where it cannot know, behind a subshell, a pipeline, `||`, a shell runner or a
+  target it cannot resolve, it reads the session's directory as before.
 
 ## 0.1.2 — 2026-09-21
 
