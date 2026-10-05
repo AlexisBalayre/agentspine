@@ -220,9 +220,10 @@ jobs:
             {"env": {"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"}}
           # Orchestrator model only: pr-ci-review sets each reviewer's model at
           # spawn time, through the aliases the env above pins. The orchestrator
-          # runs Opus because its spawn and triage decisions decide what the
-          # review covers. Posted precision is still gated by the per-important
-          # opus validators.
+          # runs Opus at its default effort because its spawn and triage
+          # decisions decide what the review covers; the correctness and security
+          # reviewers and the validators ask for high in `.claude/agents/`.
+          # Posted precision is still gated by the per-important opus validators.
           # Every verb the protocol needs is listed: unlisted ones fall through to
           # a permission prompt that nobody is here to answer, and the run halts
           # at the gate with an empty record that reads as a clean review. The

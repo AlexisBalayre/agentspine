@@ -108,8 +108,10 @@ that from frontmatter, and Codex gets the same effect from a file emitted beside
 opencode and Mistral Vibe the model can still fire them itself. See
 [the matrix](docs/capability-matrix.md#skill-invocation-control).
 
-The `review` pack also installs `.agents/agents/` and links it into Claude Code, opencode and
-Cursor. Codex and Mistral Vibe have no project-scoped subagents, so nothing is emitted for them and
+The `review` pack also installs `.agents/agents/` and links it into opencode and Cursor. Claude
+Code gets a rendered copy in `.claude/agents/` instead of a link, because three of the reviewers
+carry a key only it reads (`effort: high`) and opencode would forward that key to the model
+provider. Codex and Mistral Vibe have no project-scoped subagents, so nothing is emitted for them and
 `review-changes` degrades to dispatching the reviewer briefs inline — the review shrinks in
 mechanism, never silently to nothing.
 

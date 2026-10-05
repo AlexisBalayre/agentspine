@@ -12,6 +12,7 @@ export function describe(action: Action): string {
     case "merge-json": return `merge     ${action.target}`;
     case "symlink": return `symlink   ${action.target} -> ${action.to}`;
     case "copy-dir": return `copy      ${action.target}/`;
+    case "render-dir": return `render    ${action.target}/`;
     case "copy": return `copy      ${action.target}`;
     case "skip": return `skip      ${action.target} (${action.reason})`;
   }
@@ -52,6 +53,15 @@ export function wouldChange(action: Action, root: string): boolean {
       return !existsSync(target) || readFileSync(target, "utf8") !== readFileSync(action.from, "utf8");
     case "copy-dir":
       return !existsSync(target) || !sameTree(action.from, target);
+    case "render-dir":
+      // A link here is the shared tree itself, which must not carry what is rendered.
+      return (
+        isLink(target) ||
+        Object.entries(action.files).some(([name, content]) => {
+          const file = path.join(target, name);
+          return !existsSync(file) || readFileSync(file, "utf8") !== content;
+        })
+      );
   }
 }
 
@@ -140,6 +150,15 @@ function applyOne(action: Action, root: string): string {
       mkdirSync(path.dirname(target), { recursive: true });
       cpSync(action.from, target);
       return "copied";
+    }
+
+    case "render-dir": {
+      // Unlinked first: written through a link left by an earlier version, these files would
+      // land in the shared tree the link points at.
+      const linked = isLink(target);
+      if (linked) unlinkSync(target);
+      for (const [name, content] of Object.entries(action.files)) write(path.join(target, name), content);
+      return linked ? "rendered (replaced the symlink)" : "rendered";
     }
   }
 }

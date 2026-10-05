@@ -26,6 +26,8 @@ describe("the repo's review workflow", () => {
     expect(committed).toContain("github.actor == github.repository_owner");
     expect(committed).toContain("github.event.comment.user.login == github.repository_owner");
     expect(committed).toContain("vars.CLAUDE_REVIEW_ENABLED == 'true'");
+    // A re-run keeps the owner as `actor`, whoever started it.
+    expect(committed).toContain("github.triggering_actor == github.repository_owner");
     // `.agents/` is a symlink into templates/, so the target is startup config too.
     expect(committed).toContain('RESTORE_PATHS: "AGENTS.md .agents templates"');
   });

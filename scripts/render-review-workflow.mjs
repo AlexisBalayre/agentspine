@@ -27,8 +27,9 @@ const HEADER = `# This repository's copy of what the ci-review pack emits
 #      which is the same argument as the config restore below. A scaffolded repository has no
 #      such conflict, so the shipped template installs the published version instead.
 #   2. Only the repository owner can trigger a run: their own pull requests, pushed by them, or
-#      their \`@claude review\` comment on anyone's. The template admits the owner, org members and
-#      collaborators; here that is one account, so the gate names it.
+#      their \`@claude review\` comment on anyone's, and only they can re-run one. The template
+#      admits the owner, org members and collaborators; here that is one account, so the gate
+#      names it.
 #   3. RESTORE_PATHS carries templates/ as well, because .agents/ here is a symlink into it:
 #      restoring the link alone would still run the PR's copy of the skills and reviewer manifests.
 #
@@ -60,9 +61,11 @@ const TOOLING_STEP = `      # Built from the base branch, never from the PR head
 const OWNER_GATE = `    # Owner-only, and off until CLAUDE_REVIEW_ENABLED is set: a fork PR would otherwise queue a
     # run that reads its diff with the review token in the environment.
     # \`github.repository_owner\` is the account, so this needs no list to maintain. The actor
-    # check stops a push by someone else to the owner's PR from firing \`synchronize\`.
+    # check stops a push by someone else to the owner's PR from firing \`synchronize\`. A re-run
+    # keeps the original \`actor\` and sets \`triggering_actor\` to whoever clicked "Re-run", so
+    # that must be the owner too, or anyone with write access could re-run the owner's review.
     if: |
-      vars.CLAUDE_REVIEW_ENABLED == 'true' && (
+      vars.CLAUDE_REVIEW_ENABLED == 'true' && github.triggering_actor == github.repository_owner && (
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false &&
         github.event.pull_request.user.login == github.repository_owner &&
         github.actor == github.repository_owner) ||

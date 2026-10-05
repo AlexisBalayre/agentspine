@@ -685,3 +685,41 @@ in for knowing what the line runs.
 - **Cost accepted:** the splitter is a parser, and parsers have edge cases a regex does not. The
   ones known are written above rather than left to be discovered; the table of cases in
   `test/claude-code-adapter.test.ts` is where a new one gets added.
+
+## 28. Claude Code's agents are a rendered copy, for the keys only it reads
+
+Date: 2026-10-05
+
+Decision 8 ships agents with the intersection of frontmatter and symlinks one directory into three
+tools. Decision 21 then moved reviewer model tiers out of frontmatter and into the spawn, because a
+spawn can name a model. A spawn cannot name an effort. The template this pack is ported from now
+runs its opus-tier reviewers and its validators at `effort: high`, and the only place Claude Code
+reads that from is the agent's own frontmatter.
+
+The key cannot go in the shared manifest. opencode documents that an agent option it does not know
+is passed to the provider as a model option, so `effort: high` there is not ignored, it is sent,
+with an effect nobody here has observed. Cursor does not document what it does with one. Both are
+recorded in the matrix, read 2026-10-05.
+
+So `.claude/agents/` is no longer a link. The scaffolder renders it: each shared manifest, plus the
+lines `CLAUDE_AGENT_FRONTMATTER` in `src/plan.utils.ts` lists for it. Today that is `effort: high`
+on `review-correctness`, `review-security` and `review-validator`. opencode and Cursor still get
+the link, and the shared manifests still carry `name` and `description` only. A re-scaffold
+replaces the link an earlier version left, instead of writing through it into the shared tree.
+
+Model tiers stay at the spawn (decision 21). They could move into the same table now, but the
+spawn-time rule also covers hosts that get no rendered copy, and one rule is easier to keep than
+two. Decision 21's remark that reviewers would otherwise inherit "the orchestrator's sonnet" is
+dated: the orchestrator runs on Opus 5.5 from this change, and the rule stands for the sonnet-tier
+reviewers, which would otherwise be promoted.
+
+Not chosen: setting the level for the whole run through the workflow's `settings`. It reaches CI
+only, raises the orchestrator and every sonnet reviewer with it, and costs more than the template
+it claims to match.
+
+- **Cost accepted:** each reviewer's body exists twice in a scaffolded repository, and an edit to
+  `.agents/agents/` no longer reaches Claude Code. Both directories are generator-owned and
+  `--check` compares each against the templates, so the two cannot drift unnoticed, but "edit once,
+  every tool sees it" is no longer true of agents on Claude Code.
+- **Cost accepted:** the three reviewers run at a different effort on Claude Code than on opencode
+  and Cursor. The matrix says so; nothing emulates the key.

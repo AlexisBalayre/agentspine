@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -270,10 +270,50 @@ describe("review pack and the agents layer", () => {
     runCli(["--dir", repo, "--yes", "--packs", "review", "--tools", "claude-code,opencode,cursor"]);
 
     expect(existsSync(path.join(repo, ".agents/agents/review-security.md"))).toBe(true);
-    for (const dir of [".claude/agents", ".opencode/agent", ".cursor/agents"]) {
+    for (const dir of [".opencode/agent", ".cursor/agents"]) {
       expect(lstatSync(path.join(repo, dir)).isSymbolicLink()).toBe(true);
       expect(existsSync(path.join(repo, dir, "review-docs.md"))).toBe(true);
     }
+    expect(lstatSync(path.join(repo, ".claude/agents")).isSymbolicLink()).toBe(false);
+    expect(existsSync(path.join(repo, ".claude/agents/review-docs.md"))).toBe(true);
+  });
+
+  const frontmatterOf = (file: string) => readFileSync(path.join(repo, file), "utf8").split("---")[1] ?? "";
+
+  // opencode forwards an agent key it does not know to the model provider, so a key only
+  // Claude Code reads cannot sit in the manifest the two share.
+  it("gives Claude Code's copy of the opus-tier reviewers a high effort, and no other host's", () => {
+    runCli(["--dir", repo, "--yes", "--packs", "review", "--tools", "claude-code,opencode,cursor"]);
+
+    for (const agent of ["review-correctness", "review-security", "review-validator"]) {
+      expect(frontmatterOf(`.claude/agents/${agent}.md`)).toContain("\neffort: high\n");
+      for (const dir of [".agents/agents", ".opencode/agent", ".cursor/agents"]) {
+        expect(frontmatterOf(`${dir}/${agent}.md`)).not.toContain("effort");
+      }
+    }
+    expect(readFileSync(path.join(repo, ".claude/agents/review-docs.md"), "utf8")).toBe(
+      readFileSync(path.join(repo, ".agents/agents/review-docs.md"), "utf8"),
+    );
+    const body = (file: string) => readFileSync(path.join(repo, file), "utf8").split("---").slice(2).join("---");
+    expect(body(".claude/agents/review-security.md")).toBe(body(".agents/agents/review-security.md"));
+  });
+
+  // Earlier versions linked .claude/agents to the shared tree: writing through that link would
+  // put Claude-only keys in the manifests every other host reads.
+  it("replaces the link an earlier version left at .claude/agents instead of writing through it", () => {
+    runCli(["--dir", repo, "--yes", "--packs", "review", "--tools", "claude-code,opencode"]);
+    const claudeAgents = path.join(repo, ".claude/agents");
+    rmSync(claudeAgents, { recursive: true });
+    symlinkSync("../.agents/agents", claudeAgents);
+
+    const check = ["--dir", repo, "--check", "--packs", "review", "--tools", "claude-code,opencode"];
+    expect(runCli(check).status).toBe(1);
+    runCli(["--dir", repo, "--yes", "--force", "--packs", "review", "--tools", "claude-code,opencode"]);
+
+    expect(lstatSync(claudeAgents).isSymbolicLink()).toBe(false);
+    expect(frontmatterOf(".claude/agents/review-security.md")).toContain("effort: high");
+    expect(frontmatterOf(".agents/agents/review-security.md")).not.toContain("effort");
+    expect(runCli(check).status).toBe(0);
   });
 
   // Decision 8: Claude's `tools` list and opencode's `tools` map are incompatible, and
@@ -286,6 +326,7 @@ describe("review pack and the agents layer", () => {
     expect(frontmatter).toContain("description:");
     expect(frontmatter).not.toContain("tools:");
     expect(frontmatter).not.toContain("model:");
+    expect(frontmatter).not.toContain("effort:");
   });
 
   it("emits no agents for hosts without project-scoped subagents", () => {

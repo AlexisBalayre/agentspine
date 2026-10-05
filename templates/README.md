@@ -10,7 +10,8 @@ Layout mirrors what is emitted:
 
 ```
 agents/skills/<name>/SKILL.md    Anthropic Agent Skills spec: name + description frontmatter
-agents/agents/<name>.md          intersection-only frontmatter (name, description, body)
+agents/agents/<name>.md          intersection-only frontmatter (name, description, body);
+                                 Claude Code's copy is rendered from it, plus Claude-only keys
 agents/hooks/policies/*.sh       tool-agnostic; read the normalised AGENT_* contract
 agents/hooks/adapters/*.sh       per-tool input parsing and exit-code mapping
 agents/scripts/*.sh              worktree helpers, emitted to .agents/scripts/

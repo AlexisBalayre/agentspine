@@ -20,6 +20,11 @@ either path; they are the same bytes. What you must not do is add a file under `
 no counterpart in `templates/`, because `agentspine --check` compares the committed tree against
 what the generator would emit and will fail.
 
+`.claude/agents/` is the exception to the symlinks: real files, rendered from
+`templates/agents/agents/` with the keys only Claude Code reads (`CLAUDE_AGENT_FRONTMATTER` in
+`src/plan.utils.ts`). Edit the template or that table, never those files; `--check` fails when
+they differ from what the generator renders.
+
 `.github/workflows/claude-code-review.yml` is generated from
 `templates/github/workflows/claude-code-review.yml` by `scripts/render-review-workflow.mjs`. Edit
 the template or the script, then re-run `node scripts/render-review-workflow.mjs --write`.
