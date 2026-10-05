@@ -27,6 +27,7 @@ export type RefutedFinding = Omit<Finding, "body" | "suggestion"> & { refutation
 
 export type ReviewSummary = {
   reviewers_spawned: ReviewerArea[];
+  reviewers_returned: ReviewerArea[];
   review_mode: "full" | "incremental";
   incremental_from_sha: string | null;
   prior_importants: { file: string | null; line: string | null; status: "resolved" | "unresolved" }[];
@@ -56,6 +57,7 @@ export type MetricsRecord = {
   pr_number: number | null;
   action: "review";
   reviewers_spawned: ReviewerArea[];
+  reviewers_returned: ReviewerArea[];
   reviewers_skipped: ReviewerArea[];
   review_mode: "full" | "incremental";
   incremental_from_sha: string | null;
@@ -65,6 +67,8 @@ export type MetricsRecord = {
   process_issues: ReviewSummary["process_issues"] | null;
   comments_posted_actual: number | null;
   is_error: boolean;
+  /** Why the round is no verdict on the diff; it also sets `is_error`. Null when the record is a verdict. */
+  incomplete_reason: string | null;
   cost_usd: number | null;
   duration_ms: number | null;
   num_turns: number | null;
@@ -90,6 +94,21 @@ export const REVIEW_SUMMARY_SCHEMA: JsonSchema = {
         ]
       },
       "description": "One entry per instance; an area repeats when several ran."
+    },
+    "reviewers_returned": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "correctness",
+          "security",
+          "conventions",
+          "context",
+          "maintainability",
+          "docs"
+        ]
+      },
+      "description": "One entry per instance whose report you received and consolidated, by area as in reviewers_spawned. Emit the record only once this equals reviewers_spawned: any shortfall is posted as an incomplete review, never as a clean one."
     },
     "review_mode": {
       "type": "string",
@@ -327,6 +346,7 @@ export const REVIEW_SUMMARY_SCHEMA: JsonSchema = {
   },
   "required": [
     "reviewers_spawned",
+    "reviewers_returned",
     "review_mode",
     "incremental_from_sha",
     "prior_importants",

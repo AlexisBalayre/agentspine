@@ -122,7 +122,8 @@ machine where the hooks run.
 decides full versus incremental, Claude Code reviews the PR through the `review` pack's six
 reviewers, and a poster writes the verdict. **The model has no write access to the PR.** It emits a
 structured record; the poster renders it, anchors each important finding to a line in the diff, and
-pins a `claude-review` commit status. A run that dies still posts "this PR has not been reviewed",
+pins a `claude-review` commit status. A run that dies, or that ends before every reviewer it
+spawned has reported, still posts "not reviewed" or "review incomplete" and fails the check,
 because green silence reads exactly like a clean review.
 
 The workflow's deterministic steps are `agentspine review preflight|schema|post|metrics`, installed
