@@ -341,7 +341,6 @@ export function buildPlan(options: PlanOptions): Action[] {
   return actions;
 }
 
-/** Depth-aware link target: `.claude/agents` needs `../.agents/agents`. */
 /** Each shared manifest as Claude Code gets it: the same file, plus the keys only Claude Code reads. */
 function claudeAgents(from: string): Record<string, string> {
   const files: Record<string, string> = {};
@@ -359,6 +358,7 @@ function withFrontmatter(manifest: string, lines: string[]): string {
   return `${frontmatter}${lines.join("\n")}\n${manifest.slice(frontmatter.length)}`;
 }
 
+/** Depth-aware link target: `.claude/agents` needs `../.agents/agents`. */
 function relativeToAgents(dir: string): string {
   const depth = dir.split("/").length - 1;
   return `${"../".repeat(depth)}.agents/agents`;

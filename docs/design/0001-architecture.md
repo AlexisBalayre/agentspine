@@ -107,6 +107,8 @@ worktree scripts. Then `--packs thinking,engineering,review`.
 
 ## 8. Agents: intersection-only, three tools
 
+Amended by decision 28: Claude Code's copy is rendered, not symlinked.
+
 Skills are portable because all five tools converged on `SKILL.md`. Agents did not.
 
 Canonical `.agents/agents/*.md` carries only the intersection of frontmatter (`name`,
@@ -468,7 +470,8 @@ and builds its verdict from an artifact: a review talked into writing to the PR 
 could. The cost is a second checkout and tooling install per run, and a hand-off contract, since
 the structured output crosses as a file once a findings record outgrows a job output.
 
-**Reviewer model tiers are set at spawn time, not in frontmatter.** Decision 8 strips `model:` from
+**Reviewer model tiers are set at spawn time, not in frontmatter** (effort cannot be, see decision
+28)**.** Decision 8 strips `model:` from
 shipped agents because the key is not portable. Left there, `correctness` and `security` would
 inherit the orchestrator's sonnet and the "never downgraded" promise would be quietly false, so
 `pr-ci-review` now sets each reviewer's and validator's model explicitly when it spawns them.
@@ -719,7 +722,11 @@ it claims to match.
 
 - **Cost accepted:** each reviewer's body exists twice in a scaffolded repository, and an edit to
   `.agents/agents/` no longer reaches Claude Code. Both directories are generator-owned and
-  `--check` compares each against the templates, so the two cannot drift unnoticed, but "edit once,
-  every tool sees it" is no longer true of agents on Claude Code.
+  `--check` compares every manifest the templates ship against each, so an edit to one cannot go
+  unnoticed, but "edit once, every tool sees it" is no longer true of agents on Claude Code.
+- **Cost accepted:** a manifest renamed or removed in a later version leaves its old copy in
+  `.claude/agents/`, where Claude Code keeps loading it and `--check` does not look. The directory
+  is also where a project keeps its own agents, so the scaffolder does not delete what it did not
+  just write. A link could not hold leftovers.
 - **Cost accepted:** the three reviewers run at a different effort on Claude Code than on opencode
   and Cursor. The matrix says so; nothing emulates the key.
