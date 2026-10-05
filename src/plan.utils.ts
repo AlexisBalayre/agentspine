@@ -1,5 +1,5 @@
 import path from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Stack, Tool } from "./detect.utils.js";
 
 export type Action =
@@ -8,6 +8,7 @@ export type Action =
   | { kind: "merge-json"; target: string; value: Record<string, unknown> }
   | { kind: "symlink"; target: string; to: string }
   | { kind: "copy-dir"; target: string; from: string }
+  | { kind: "render-dir"; target: string; files: Record<string, string> }
   | { kind: "copy"; target: string; from: string }
   | { kind: "skip"; target: string; reason: string };
 
@@ -50,6 +51,17 @@ const AGENT_DIRS: Partial<Record<Tool, string>> = {
   "claude-code": ".claude/agents",
   opencode: ".opencode/agent",
   cursor: ".cursor/agents",
+};
+
+/**
+ * Frontmatter only Claude Code reads, by agent. It goes into Claude Code's own copy of a manifest
+ * and never into the shared one: opencode forwards an agent key it does not know to the model
+ * provider as an option, so the same line would mean something else there.
+ */
+const CLAUDE_AGENT_FRONTMATTER: Record<string, string[]> = {
+  "review-correctness": ["effort: high"],
+  "review-security": ["effort: high"],
+  "review-validator": ["effort: high"],
 };
 
 export type Pack = keyof typeof PACKS;
@@ -250,6 +262,10 @@ export function buildPlan(options: PlanOptions): Action[] {
         actions.push({ kind: "skip", target: `${tool} agents`, reason: "no project-scoped subagents; review-changes degrades to inline briefs" });
         continue;
       }
+      if (tool === "claude-code") {
+        actions.push({ kind: "render-dir", target: dir, files: claudeAgents(path.join(templates, "agents/agents")) });
+        continue;
+      }
       actions.push(
         symlink
           ? { kind: "symlink", target: dir, to: relativeToAgents(dir) }
@@ -323,6 +339,23 @@ export function buildPlan(options: PlanOptions): Action[] {
   }
 
   return actions;
+}
+
+/** Each shared manifest as Claude Code gets it: the same file, plus the keys only Claude Code reads. */
+function claudeAgents(from: string): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (const file of readdirSync(from).filter((name) => name.endsWith(".md")).sort()) {
+    const manifest = readFileSync(path.join(from, file), "utf8");
+    const extra = CLAUDE_AGENT_FRONTMATTER[path.basename(file, ".md")] ?? [];
+    files[file] = extra.length > 0 ? withFrontmatter(manifest, extra) : manifest;
+  }
+  return files;
+}
+
+function withFrontmatter(manifest: string, lines: string[]): string {
+  const frontmatter = /^---\n[\s\S]*?\n(?=---\n)/.exec(manifest)?.[0];
+  if (frontmatter === undefined) throw new Error("agent manifest has no frontmatter to extend");
+  return `${frontmatter}${lines.join("\n")}\n${manifest.slice(frontmatter.length)}`;
 }
 
 /** Depth-aware link target: `.claude/agents` needs `../.agents/agents`. */

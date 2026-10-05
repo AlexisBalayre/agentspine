@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { commentableLines, resolveAnchor, trueLine } from "./diff-anchor.utils.js";
 import { bodyLines } from "./review-body.utils.js";
+import { noVerdictReason } from "./review-completeness.utils.js";
 import { structuredOutput } from "./structured-output.utils.js";
 import { type Finding, parseReviewSummary, type ReviewSummary } from "./review-summary.schemas.js";
 
@@ -155,14 +156,15 @@ function postEach(repository: string, prNumber: number, commitSha: string, comme
   return { accepted, rejected };
 }
 
-export function main(): void {
+/** The step's exit code: non-zero when the round is no verdict, so the job shows red beside the status. */
+export function main(): number {
   const env = process.env;
   const repository = env.GITHUB_REPOSITORY ?? "";
   const runId = env.GITHUB_RUN_ID ?? "";
   const prRaw = env.REVIEW_PR_NUMBER ?? "";
   if (!repository || !runId || !/^\d+$/.test(prRaw)) {
     warn("repository, run id or PR number missing; cannot post the review");
-    return;
+    return 0;
   }
   const prNumber = Number.parseInt(prRaw, 10);
 
@@ -172,15 +174,21 @@ export function main(): void {
   const stepOutcome = env.REVIEW_STEP_OUTCOME ?? "";
   const summary =
     stepOutcome === "" || stepOutcome === "success" ? parseSummary(structuredOutput(env)) : null;
-  const { anchored, unanchored } = summary
-    ? prepare(summary, env.REVIEW_MERGE_BASE ?? "")
-    : { anchored: [], unanchored: [] };
+  const noVerdict = noVerdictReason(summary, stepOutcome);
+  // A round with no verdict asks for a re-run, which raises any findings it
+  // carries again, so anchoring them now would put each one on the diff twice.
+  const { anchored, unanchored } =
+    summary && !noVerdict ? prepare(summary, env.REVIEW_MERGE_BASE ?? "") : { anchored: [], unanchored: [] };
 
   const runUrl = `https://github.com/${repository}/actions/runs/${runId}`;
   const body = (findings: Finding[], anchoredCount: number) =>
-    [REVIEW_HEADING, "", ...bodyLines(summary, findings, anchoredCount), "", `<sub>[review run](${runUrl})</sub>`].join(
-      "\n",
-    );
+    [
+      REVIEW_HEADING,
+      "",
+      ...bodyLines(summary, noVerdict, findings, anchoredCount),
+      "",
+      `<sub>[review run](${runUrl})</sub>`,
+    ].join("\n");
 
   let posted = 0;
   let reviewPosted = false;
@@ -203,7 +211,7 @@ export function main(): void {
     const sha = env.REVIEW_COMMIT_SHA ?? "";
     if (sha) {
       const importants = anchored.length + unanchored.length;
-      if (!summary) setCommitStatus(repository, sha, "failure", "the diff was not reviewed");
+      if (noVerdict) setCommitStatus(repository, sha, "failure", noVerdict);
       else if (!reviewPosted) setCommitStatus(repository, sha, "failure", "the review could not be posted");
       else {
         setCommitStatus(
@@ -219,4 +227,6 @@ export function main(): void {
     const output = env.REVIEW_POSTED_OUTPUT ?? "posted.json";
     writeFileSync(output, `${JSON.stringify({ comments_posted: posted }, null, 2)}\n`);
   }
+  if (noVerdict) process.stdout.write(`::error::${noVerdict}\n`);
+  return noVerdict ? 1 : 0;
 }

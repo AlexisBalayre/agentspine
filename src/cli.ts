@@ -325,7 +325,7 @@ async function review(step: string | undefined): Promise<number> {
       process.stdout.write(JSON.stringify(REVIEW_SUMMARY_SCHEMA));
       return 0;
     }
-    case "post": (await import("./review/post.script.js")).main(); return 0;
+    case "post": return (await import("./review/post.script.js")).main();
     case "metrics": (await import("./review/metrics.script.js")).main(); return 0;
     default:
       process.stderr.write(`agentspine: review needs one of ${REVIEW_STEPS.join(", ")}\n`);

@@ -65,9 +65,10 @@ function runReview(step: string, fx: ReturnType<typeof fixture>, env: Record<str
   });
 }
 
-const importantAt = (line: string) =>
+const importantAt = (line: string, returned: string[] = ["correctness"]) =>
   JSON.stringify({
     reviewers_spawned: ["correctness"],
+    reviewers_returned: returned,
     review_mode: "full",
     incremental_from_sha: null,
     prior_importants: [],
@@ -122,20 +123,53 @@ describe("agentspine review post", () => {
     expect(payload.comments[0].body).not.toContain("```suggestion");
   });
 
-  it("says the PR was not reviewed, with a red status, when the model step failed", () => {
+  it("says the PR was not reviewed, with a red status and a failed step, when the model step failed", () => {
     const fx = fixture();
-    runReview("post", fx, { REVIEW_STEP_OUTCOME: "failure", REVIEW_STRUCTURED_OUTPUT: importantAt("2") });
+    const result = runReview("post", fx, { REVIEW_STEP_OUTCOME: "failure", REVIEW_STRUCTURED_OUTPUT: importantAt("2") });
     const [review, status] = calls(fx.log);
-    expect(JSON.parse(review?.input ?? "{}").body).toContain("This PR has not been reviewed");
+    expect(JSON.parse(review?.input ?? "{}").body).toContain(
+      "**Not reviewed: the review step's outcome was failure; re-run.**",
+    );
     expect(JSON.parse(status?.input ?? "{}")).toMatchObject({ state: "failure" });
+    expect(result.status).toBe(1);
   });
 
-  it("treats output that breaks the contract as no review at all", () => {
+  // The action can skip itself and still report success, leaving no output at all; a record
+  // without `reviewers_returned` is what a skill older than this tooling would emit.
+  it.each([
+    ["no structured output", ""],
+    ["output that breaks the contract", '{"findings": []}'],
+    ["a record that does not say which reviewers returned", (() => {
+      const { reviewers_returned: _dropped, ...rest } = JSON.parse(importantAt("2"));
+      return JSON.stringify(rest);
+    })()],
+  ])("treats %s from a successful step as no review at all", (_label, output) => {
     const fx = fixture();
-    runReview("post", fx, { REVIEW_STEP_OUTCOME: "success", REVIEW_STRUCTURED_OUTPUT: '{"findings": []}' });
+    const result = runReview("post", fx, { REVIEW_STEP_OUTCOME: "success", REVIEW_STRUCTURED_OUTPUT: output });
     const [review, status] = calls(fx.log);
-    expect(JSON.parse(review?.input ?? "{}").body).toContain("This PR has not been reviewed");
+    expect(JSON.parse(review?.input ?? "{}").body).toContain(
+      "**Not reviewed: the run left no structured output that matches the schema; re-run.**",
+    );
     expect(JSON.parse(status?.input ?? "{}")).toMatchObject({ state: "failure" });
+    expect(result.status).toBe(1);
+  });
+
+  // A re-run raises the findings again, so anchoring them now would put each on the diff twice.
+  it("posts an incomplete round, without its findings, when a spawned reviewer never returned", () => {
+    const fx = fixture();
+    const result = runReview("post", fx, {
+      REVIEW_STEP_OUTCOME: "success",
+      REVIEW_STRUCTURED_OUTPUT: importantAt("2", []),
+    });
+    const [review, status] = calls(fx.log);
+    const payload = JSON.parse(review?.input ?? "{}");
+    expect(payload.body).toContain("**Review incomplete: 0 of 1 reviewers returned; re-run.**");
+    expect(payload).not.toHaveProperty("comments");
+    expect(JSON.parse(status?.input ?? "{}")).toMatchObject({
+      state: "failure",
+      description: "Review incomplete: 0 of 1 reviewers returned; re-run",
+    });
+    expect(result.status).toBe(1);
   });
 
   it("falls back to individual comments when the batch review is rejected", () => {
@@ -162,11 +196,45 @@ describe("agentspine review metrics", () => {
     expect(result.status).toBe(0);
     const record = JSON.parse(readFileSync(output, "utf8"));
     expect(record).toMatchObject({
+      schema_version: 2,
       is_error: true,
+      incomplete_reason: "Not reviewed: the review step's outcome was failure; re-run",
       pr_number: 7,
       comments_posted_actual: 1,
       reviewers_spawned: ["correctness"],
+      reviewers_returned: ["correctness"],
       reviewers_skipped: ["security", "conventions", "context", "maintainability", "docs"],
+    });
+  });
+});
+
+describe("agentspine review metrics, on a round with no verdict", () => {
+  const record = (env: Record<string, string>) => {
+    const fx = fixture();
+    const output = path.join(fx.dir, "record.json");
+    runReview("metrics", fx, { REVIEW_STEP_OUTCOME: "success", REVIEW_METRICS_OUTPUT: output, ...env });
+    return JSON.parse(readFileSync(output, "utf8"));
+  };
+
+  // An errored record is never the preflight's prior, so the head is reviewed again.
+  it("records a round whose reviewers never returned as errored, with the reason", () => {
+    expect(record({ REVIEW_STRUCTURED_OUTPUT: importantAt("2", []) })).toMatchObject({
+      is_error: true,
+      incomplete_reason: "Review incomplete: 0 of 1 reviewers returned; re-run",
+    });
+  });
+
+  it("records a successful step that left no output as errored", () => {
+    expect(record({ REVIEW_STRUCTURED_OUTPUT: "" })).toMatchObject({
+      is_error: true,
+      incomplete_reason: "Not reviewed: the run left no structured output that matches the schema; re-run",
+    });
+  });
+
+  it("leaves a finished round clean", () => {
+    expect(record({ REVIEW_STRUCTURED_OUTPUT: importantAt("2") })).toMatchObject({
+      is_error: false,
+      incomplete_reason: null,
     });
   });
 });

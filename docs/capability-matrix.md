@@ -52,7 +52,7 @@ Neither holds for agents. See decision 8 in [`design/0001-architecture.md`](desi
 
 | | Memory | Skills | Hooks | Agents |
 | :-- | :-- | :-- | :-- | :-- |
-| **Claude Code** | `CLAUDE.md` -> `@AGENTS.md` | symlink | `settings.json`, deep-merged | symlink (v0.3) |
+| **Claude Code** | `CLAUDE.md` -> `@AGENTS.md` | symlink | `settings.json`, deep-merged | rendered copy, plus Claude-only keys |
 | **opencode** | native | nothing: native | JS plugin shim | symlink (v0.3) |
 | **Codex** | native | nothing: native | managed block in `config.toml` | none |
 | **Mistral Vibe** | native | nothing: native | managed block in `hooks.toml` | none |
@@ -119,6 +119,25 @@ restores implicit invocation. A test asserts the emitted payload for that reason
   subagents. Not a like-for-like target, so nothing is emitted.
 - **Claude-only:** `PreCompact`, the comment-pruner dispatch, and `Use PROACTIVELY` auto-dispatch.
 
+## Agent frontmatter
+
+Read 2026-10-05, from each tool's documentation. This is why Claude Code's agents are a rendered
+copy and not the shared files (decision 28).
+
+| | Keys that set reasoning effort | A key the tool does not know |
+| :-- | :-- | :-- |
+| **Claude Code** | `effort` (`low` to `max`); overrides the session's level, which a subagent otherwise inherits. A spawn can set a model, not an effort | ignored, no error (D) |
+| **opencode** | none of its own; provider options such as `reasoningEffort` | **passed to the provider as a model option** (D) |
+| **Cursor** | none documented (`name`, `description`, `model`, `readonly`, `is_background`) | not documented |
+
+- **`effort: high` is emitted for Claude Code only**, on `review-correctness`, `review-security`
+  and `review-validator`. On opencode and Cursor those reviewers run at whatever effort the
+  session has. Nothing emulates the key there.
+- **Cursor also reads `.claude/agents/`**, with `.cursor/agents/` winning on a name conflict (D).
+  Wired for both, Cursor reads the shared manifests. Wired for Claude Code alone, a Cursor user
+  in the same repository gets Claude's copies, `effort` key included, and Cursor does not
+  document what it does with a key it does not know.
+
 ## Verified against
 
 | Tool | Version checked | Date | How |
@@ -143,6 +162,11 @@ rows are honest about which claims are tested and which are read.
 - Cursor rules — https://cursor.com/docs/rules
 - Mistral Vibe — https://github.com/mistralai/mistral-vibe (hook models and protocol read from
   `vibe/core/hooks/models.py`, which the docs do not cover)
+- Agent frontmatter, all read 2026-10-05:
+  - Claude Code — https://code.claude.com/docs/en/sub-agents ("Supported frontmatter fields"),
+    https://code.claude.com/docs/en/model-config ("Adjust effort level")
+  - opencode — https://opencode.ai/docs/agents/ ("Additional")
+  - Cursor — https://cursor.com/docs/context/subagents
 - Skill invocation control, all read 2026-09-17:
   - Claude Code — https://code.claude.com/docs/en/skills ("Control who invokes a skill")
   - Cursor — https://cursor.com/docs/context/skills

@@ -108,8 +108,10 @@ that from frontmatter, and Codex gets the same effect from a file emitted beside
 opencode and Mistral Vibe the model can still fire them itself. See
 [the matrix](docs/capability-matrix.md#skill-invocation-control).
 
-The `review` pack also installs `.agents/agents/` and links it into Claude Code, opencode and
-Cursor. Codex and Mistral Vibe have no project-scoped subagents, so nothing is emitted for them and
+The `review` pack also installs `.agents/agents/` and links it into opencode and Cursor. Claude
+Code gets a rendered copy in `.claude/agents/` instead of a link, because three of the reviewers
+carry a key only it reads (`effort: high`) and opencode would forward that key to the model
+provider. Codex and Mistral Vibe have no project-scoped subagents, so nothing is emitted for them and
 `review-changes` degrades to dispatching the reviewer briefs inline — the review shrinks in
 mechanism, never silently to nothing.
 
@@ -122,7 +124,8 @@ machine where the hooks run.
 decides full versus incremental, Claude Code reviews the PR through the `review` pack's six
 reviewers, and a poster writes the verdict. **The model has no write access to the PR.** It emits a
 structured record; the poster renders it, anchors each important finding to a line in the diff, and
-pins a `claude-review` commit status. A run that dies still posts "this PR has not been reviewed",
+pins a `claude-review` commit status. A run that dies, or that ends before every reviewer it
+spawned has reported, still posts "not reviewed" or "review incomplete" and fails the check,
 because green silence reads exactly like a clean review.
 
 The workflow's deterministic steps are `agentspine review preflight|schema|post|metrics`, installed

@@ -4,6 +4,7 @@ import { parseReviewSummary, REVIEW_SUMMARY_SCHEMA, type ReviewSummary } from ".
 function summary(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const base: ReviewSummary = {
     reviewers_spawned: ["correctness", "docs"],
+    reviewers_returned: ["correctness", "docs"],
     review_mode: "full",
     incremental_from_sha: null,
     prior_importants: [],
@@ -53,6 +54,12 @@ describe("review summary contract", () => {
   it("rejects a missing required field", () => {
     const { findings: _dropped, ...rest } = summary();
     expect(parse(rest)).toEqual({ rejected: expect.stringContaining("$.findings: required") });
+  });
+
+  // Without the count a record cannot be told from one whose reviewers never reported.
+  it("rejects a record that does not say which reviewers returned", () => {
+    const { reviewers_returned: _dropped, ...rest } = summary();
+    expect(parse(rest)).toEqual({ rejected: expect.stringContaining("$.reviewers_returned: required") });
   });
 
   it("rejects a value outside an enum", () => {

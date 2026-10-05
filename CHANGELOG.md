@@ -6,6 +6,37 @@ scaffolded tree — CI gates, contributor tooling, the design record — are not
 The emitted CI review workflow pins the version that scaffolded it, so upgrading a scaffolded
 repository means re-running `npx agentspine`.
 
+## Unreleased
+
+### Changed
+
+- The emitted review workflow runs its orchestrator on Opus 5.5 instead of Sonnet 5, and pins the
+  `opus` and `sonnet` aliases the reviewers are spawned with to `claude-opus-5-5` and
+  `claude-sonnet-5-5`, so a Claude Code bump cannot move a tier silently. A review costs more per
+  run. It runs through `claude-code-action` v1.0.237.
+- `.claude/agents/` is now a directory of real files, not a link to `.agents/agents/`: each shared
+  reviewer manifest, plus the keys only Claude Code reads. `review-correctness`, `review-security`
+  and `review-validator` ask for `effort: high` there. The key stays out of the shared manifests
+  because opencode forwards an agent key it does not know to the model provider. Re-scaffolding
+  replaces the old link. An edit under `.agents/agents/` no longer reaches Claude Code.
+- The review record carries `reviewers_returned`, and the metrics record `incomplete_reason`; the
+  metrics `schema_version` is now 2. The workflow, the `pr-ci-review` skill and the tooling move
+  together, so re-scaffold rather than bumping the workflow's pin by hand: the new tooling rejects
+  a record from the old skill as not reviewed.
+
+### Fixed
+
+- A review whose reviewers had not reported was posted as "No issues found". Recent Claude Code
+  runs a subagent in the background unless asked otherwise, and the action keeps the first result
+  a run emits, so an orchestrator that ended its turn early handed over an empty record, and the
+  preflight then took that head as reviewed. The workflow now turns background tasks off, and the
+  poster checks the record: one where fewer reviewers returned than were spawned, or where a full
+  review spawned none, is posted as incomplete with a failed `claude-review` status and a failed
+  step, without its findings, and is recorded as errored so the next run reviews the head again.
+- A review step that reported success and left no structured output, as the action does when it
+  skips itself, posted "not reviewed" but left the poster's step green and the record clean. Both
+  now fail.
+
 ## 0.1.3 — 2026-09-22
 
 ### Fixed
