@@ -76,3 +76,47 @@ describe.each([
     expect(workflow).toMatch(/post-review:\n\s+needs: claude-review\n\s+if: always\(\)/);
   });
 });
+
+/** The managed settings the lock step writes, parsed. */
+function managedSettings(workflow: string) {
+  const heredoc = /managed-settings\.json >\/dev\/null <<'EOF'\n([\s\S]*?)\n {10}EOF\n/.exec(workflow)?.[1] ?? "";
+  return JSON.parse(heredoc.replace(/^ {10}/gm, ""));
+}
+
+describe.each([
+  ["the emitted template", "templates/github/workflows/claude-code-review.yml"],
+  ["this repo's copy", ".github/workflows/claude-code-review.yml"],
+])("%s holds the model to what a review needs", (_label, file) => {
+  const workflow = readFileSync(path.resolve(file), "utf8");
+  const settings = managedSettings(workflow);
+
+  // Only managed rules count, so the skill's allowed-tools and the repo's settings cannot widen them.
+  it("takes its permission rules from managed settings alone", () => {
+    expect(settings.allowManagedPermissionRulesOnly).toBe(true);
+    expect(settings.permissions.deny).toEqual(expect.arrayContaining(["Edit", "Write", "NotebookEdit"]));
+  });
+
+  // `gh api` bundles short flags into a POST, `git grep -O` and `git difftool` run commands.
+  it("allows no verb that can write or run a command", () => {
+    for (const rule of settings.permissions.allow) {
+      expect(rule).not.toMatch(/gh api|git grep|git diff\*|git fetch|git checkout/);
+    }
+  });
+
+  it("runs Bash in a sandbox that fails the run rather than start without it", () => {
+    expect(settings.sandbox).toMatchObject({ enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false });
+    expect(settings.sandbox.network.allowedDomains).toEqual(["api.github.com"]);
+  });
+
+  it("scrubs credentials from the shell the model drives", () => {
+    const job = workflow.split("\n  claude-review:\n")[1]?.split("\n  post-review:\n")[0] ?? "";
+    expect(job).toContain('CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"');
+  });
+
+  // Both jobs check out the PR head, where a fork can commit any of these names as a symlink.
+  it("keeps every hand-off file out of the checkout", () => {
+    expect(workflow).not.toContain("${{ github.workspace }}");
+    expect(workflow).not.toMatch(/^\s+path: review-/m);
+    expect(workflow).not.toMatch(/> "?review-output\//);
+  });
+});

@@ -1,4 +1,11 @@
-import { decideMode, newestCleanRecord, type PriorRecord, porcelainPaths } from "../../src/review/preflight.utils.js";
+import {
+  decideMode,
+  isPartialReview,
+  newestCleanRecord,
+  type PriorRecord,
+  parseReviewRequest,
+  porcelainPaths,
+} from "../../src/review/preflight.utils.js";
 import { describe, expect, it } from "vitest";
 
 function record(overrides: Partial<PriorRecord> = {}): PriorRecord {
@@ -7,6 +14,7 @@ function record(overrides: Partial<PriorRecord> = {}): PriorRecord {
     commit_sha: "aaa",
     timestamp: "2026-08-01T00:00:00.000Z",
     is_error: false,
+    partial: false,
     ...overrides,
   };
 }
@@ -42,6 +50,12 @@ describe("newestCleanRecord", () => {
     const shaless = record({ timestamp: "2026-08-03T00:00:00.000Z", commit_sha: null });
     const clean = record();
     expect(newestCleanRecord([errored, shaless, clean])).toBe(clean);
+  });
+
+  it("never takes a partial review as the prior", () => {
+    const partial = record({ timestamp: "2026-08-03T00:00:00.000Z", partial: true });
+    const complete = record();
+    expect(newestCleanRecord([partial, complete])).toBe(complete);
   });
 
   it("returns null when nothing usable exists", () => {
@@ -92,5 +106,58 @@ describe("decideMode", () => {
 
   it("falls back to full when the delta contains a merge from the base", () => {
     expect(decideMode({ ...base, prior: record(), hasMerges: true })).toEqual({ kind: "full" });
+  });
+});
+
+describe("isPartialReview", () => {
+  it("counts a quick review as partial", () => {
+    expect(isPartialReview("quick", [])).toBe(true);
+  });
+
+  it("counts a review restricted to named areas as partial", () => {
+    expect(isPartialReview("deep", ["security"])).toBe(true);
+  });
+
+  it("counts a standard or deep review of the gated areas as complete", () => {
+    expect(isPartialReview("standard", [])).toBe(false);
+    expect(isPartialReview("deep", [])).toBe(false);
+  });
+
+  it("reads a record from before the request fields as complete", () => {
+    expect(isPartialReview(undefined, undefined)).toBe(false);
+  });
+});
+
+describe("parseReviewRequest", () => {
+  const standard = { full: false, depth: "standard", areas: [] };
+
+  it.each([
+    ["asks for a standard review of the gated areas by default", "@claude review", standard],
+    [
+      "reads full, a depth, and areas in any order",
+      "@claude review security deep full docs",
+      { full: true, depth: "deep", areas: ["security", "docs"] },
+    ],
+    ["ignores case", "@Claude Review Quick Correctness", { ...standard, depth: "quick", areas: ["correctness"] }],
+    [
+      "splits words on commas",
+      "@claude review correctness,security",
+      { ...standard, areas: ["correctness", "security"] },
+    ],
+    ["reads a keyword before a full stop", "@claude review full.", { ...standard, full: true }],
+    ["reads a keyword in a code span", "`@claude review full`", { ...standard, full: true }],
+    ["reads a keyword in bold", "**@claude review deep**", { ...standard, depth: "deep" }],
+    ["reads a keyword after a colon", "@claude review: quick", { ...standard, depth: "quick" }],
+    ["stops at the first word that is not a keyword", "@claude review, thanks for the security fix", standard],
+    ["keeps a hyphenated word whole", "@claude review security-related changes", standard],
+    ["takes spec as prose, not an area", "@claude review spec", standard],
+    ["reads only the trigger's own line", "@claude review\nsecurity looks fine to me", standard],
+    [
+      "skips a trigger quoted from an earlier comment",
+      "> @claude review security\n\n@claude review deep",
+      { ...standard, depth: "deep" },
+    ],
+  ])("%s", (_label, comment, expected) => {
+    expect(parseReviewRequest(comment)).toEqual(expected);
   });
 });

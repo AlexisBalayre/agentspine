@@ -146,6 +146,66 @@ copy and not the shared files (decision 28).
   in the same repository gets Claude's copies, `effort` key included, and Cursor does not
   document what it does with a key it does not know.
 
+## The CI review's lock (Claude Code)
+
+Read 2026-10-18, from Claude Code's documentation. The emitted review workflow writes these into
+`/etc/claude-code/managed-settings.json`, the managed settings path on Linux (decision 31). The run
+uses the Claude Code that `claude-code-action` v1.0.237 bundles, 2.1.285 (its
+`@anthropic-ai/claude-agent-sdk` 0.3.285, whose `claudeCodeVersion` is 2.1.285).
+
+| Setting or fact | What the docs say it does |
+| :-- | :-- |
+| `allowManagedPermissionRulesOnly` | ignores `allow`, `ask` and `deny` rules from user, project, local and `--settings` files, and `--allowedTools`; from 2.1.282, also skills' `allowed-tools` |
+| `permissions.defaultMode: "dontAsk"` | denies every call that would otherwise prompt; reads in the working directory, allowed tools and the built-in read-only commands still run |
+| Built-in read-only commands | `ls`, `cat`, `echo`, `pwd`, `head`, `tail`, `grep`, `find`, `wc`, `which`, `diff`, `stat`, `du`, `cd` and read-only forms of `git` run without a prompt in every mode; the set is not configurable, and only an `ask` or `deny` rule for a command changes it |
+| `--permission-mode` | overrides `defaultMode`, which is why `deny` holds the file tools rather than the mode |
+| `disableAutoMode`, `permissions.disableBypassPermissionsMode` | `"disable"` turns each mode off; accepted in any settings file, not only managed ones. `disableAutoMode` is documented at the top level, and also accepted as `permissions.disableAutoMode` |
+| `--allowedTools "Glob,Grep"` | on Linux, macOS and WSL both tools are absent by default, and `find` and `grep` run through Bash instead; naming either in `--allowedTools` restores both, while an allow rule in a settings file does not |
+| `Bash(git diff *)` | the space before `*` stops it matching `git diff-index`; a `*` matches any text, spaces included, so `Bash(git diff*)` also matches `git difftool` |
+| `sandbox.enabled`, `failIfUnavailable`, `allowUnsandboxedCommands`, `autoAllowBashIfSandboxed` | Bash in a sandbox; exit at startup if it cannot start; no retry outside it; no auto-approval for sandboxed calls |
+| `sandbox.network.allowedDomains`, `allowManagedDomainsOnly` | outbound hosts for sandboxed commands, locked to the managed list |
+| Sandbox filesystem | writes only to the working directory and the per-user temp directory `$TMPDIR` points to, by default; reads are not restricted |
+| Linux sandbox | needs `bubblewrap` and `socat`, which the workflow installs |
+| `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` | strips credentials, recognised by variable name or value shape, from the environments of the subprocesses Claude Code starts, Bash among them; leaves `GH_TOKEN` and `GITHUB_TOKEN` so `gh` keeps working |
+| `--effort` | `low`, `medium`, `high`, `xhigh`, `max`; available levels depend on the model |
+| Result message | `permission_denials` (`tool_name`, `tool_input`); `modelUsage` per model, subagents included; `usage` covers the main loop only |
+
+- **`$TMPDIR` on the runner is not `RUNNER_TEMP`,** which holds `$GITHUB_ENV`: GitHub's runner sets
+  `RUNNER_TEMP` and never `TMPDIR` (a search of `actions/runner` finds `TMPDIR` only in a vendored
+  `dotnet-install.sh`, 2026-10-18). Were it set there, the sandbox would let a review write the
+  job's environment file.
+- **The Claude OAuth token is not named** in the scrub's documented list. The docs say only that
+  "the Claude Code process keeps the credentials for its own API calls", and the token's name fits
+  the credential-name rule. The emitted comment does not claim it by name.
+- **Not documented, and not relied on:** that the scrub changes the permission mode. The
+  template this pipeline is ported from says it forces default mode. The emitted comment says only
+  that a run in any mode refuses an unlisted verb, since `dontAsk` denies it and a run in any other
+  mode has nobody to answer the prompt.
+
+## What the CI review rests on outside Claude Code
+
+Read 2026-10-18. The emitted review workflow's comments cite these.
+
+- **claude-code-action runs agent mode here, which sets no permission mode.** At v1.0.237
+  (`fd1c128`), a `prompt` input selects agent mode on a comment event and on a pull request's
+  `opened`, `synchronize`, `ready_for_review` and `reopened` (`src/modes/detector.ts:41-42` and
+  `:73-74`), unless `track_progress` is set, which forces tag mode (`:20-31`). Agent mode passes
+  the workflow's `claude_args` after its own `--mcp-config` and nothing else
+  (`src/modes/agent/index.ts:122-132`). Tag mode adds `--permission-mode acceptEdits`
+  (`src/modes/tag/index.ts:186`). The workflow sets `prompt` and never `track_progress`.
+- **`gh api` turns into a POST on any field, and short flags bundle.** The manual: "The default
+  HTTP request method is `GET` normally and `POST` if any parameters were added", with `-i` for
+  `--include` and `-f` for `--raw-field` ([gh api](https://cli.github.com/manual/gh_api)). gh
+  2.92.0 parses flags with `spf13/pflag` v1.0.10 (`go.mod:53`), whose `parseShortArg` reads each
+  letter of `-if` as its own flag (`flag.go:1116-1121`). So `-if body=x` is a POST.
+- **A reaction on a `@claude review` comment needs `issues: write`.** GitHub lists creating and
+  deleting an issue comment's reaction under the "Issues" repository permission, write
+  ([permissions for fine-grained tokens](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)).
+- **Ubuntu 24.04 restricts unprivileged user namespaces**, which the workflow lifts before the
+  Linux sandbox starts: "In combination with the `apparmor` package, the Ubuntu kernel now restricts the use of
+  unprivileged user namespaces", lifted by `kernel.apparmor_restrict_unprivileged_userns=0`
+  ([24.04 release notes](https://discourse.ubuntu.com/t/ubuntu-24-04-lts-noble-numbat-release-notes/39890)).
+
 ## Verified against
 
 | Tool | Version checked | Date | How |
@@ -177,6 +237,16 @@ rows are honest about which claims are tested and which are read.
   - Cursor — https://cursor.com/docs/context/subagents
 - Session transcripts, read 2026-10-18: Claude Code — https://code.claude.com/docs/en/hooks
   (`transcript_path` in the common input fields)
+- The CI review's lock, all read 2026-10-18:
+  - https://code.claude.com/docs/en/managed-settings ("Deploy a managed settings file", "Keys only
+    a managed source can set")
+  - https://code.claude.com/docs/en/settings-reference ("Permission settings", "Sandbox settings")
+  - https://code.claude.com/docs/en/permissions ("Permission modes", "Wildcard patterns")
+  - https://code.claude.com/docs/en/sandboxing ("Filesystem isolation", "Set up Linux and WSL2")
+  - https://code.claude.com/docs/en/env-vars ("What the subprocess environment scrub removes")
+  - https://code.claude.com/docs/en/cli-reference (`--effort`, `--permission-mode`)
+  - https://code.claude.com/docs/en/headless ("Turn off permission prompts in unattended runs")
+  - https://code.claude.com/docs/en/agent-sdk/cost-tracking ("Break down usage per model")
 - Skill invocation control, all read 2026-09-17:
   - Claude Code — https://code.claude.com/docs/en/skills ("Control who invokes a skill")
   - Cursor — https://cursor.com/docs/context/skills

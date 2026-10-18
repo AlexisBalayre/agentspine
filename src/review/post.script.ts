@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { commentableLines, resolveAnchor, trueLine } from "./diff-anchor.utils.js";
-import { bodyLines } from "./review-body.utils.js";
+import { bodyLines, commentBody } from "./review-body.utils.js";
 import { noVerdictReason } from "./review-completeness.utils.js";
 import { structuredOutput } from "./structured-output.utils.js";
 import { type Finding, parseReviewSummary, type ReviewSummary } from "./review-summary.schemas.js";
@@ -58,19 +58,6 @@ function fileDiff(mergeBase: string, file: string): string {
     warn(`could not diff ${file}; its findings go in the review body`);
     return "";
   }
-}
-
-function commentBody(finding: Finding, relocatedFrom: number | null): string {
-  const parts: string[] = [];
-  if (relocatedFrom !== null) parts.push(`Re: \`${finding.file}:${relocatedFrom}\``, "");
-  parts.push(finding.body ?? finding.description);
-  if (finding.suggestion !== null) {
-    // A committable suggestion rewrites the line it is attached to, so on a
-    // relocated anchor it would replace code the finding never mentioned. Same
-    // text, inert fence.
-    parts.push("", relocatedFrom === null ? "```suggestion" : "```", finding.suggestion, "```");
-  }
-  return parts.join("\n");
 }
 
 function prepare(summary: ReviewSummary, mergeBase: string) {
@@ -208,21 +195,28 @@ export function main(): number {
     reviewPosted = true;
     process.stdout.write(`posted a review on #${prNumber} with ${posted} inline comment(s)\n`);
   } finally {
+    const importants = anchored.length + unanchored.length;
+    const failure = noVerdict ?? (reviewPosted ? null : "the review could not be posted");
+    // A quick or area-restricted pass is no merge signal, so one that reaches a
+    // verdict leaves the status to the last full review, whose red it would
+    // otherwise turn green. One that dies still fails the check.
+    const partial = env.REVIEW_PARTIAL === "true";
+    const outcome = importants > 0 ? `${importants} important finding(s)` : "no blocking issues";
     const sha = env.REVIEW_COMMIT_SHA ?? "";
-    if (sha) {
-      const importants = anchored.length + unanchored.length;
-      if (noVerdict) setCommitStatus(repository, sha, "failure", noVerdict);
-      else if (!reviewPosted) setCommitStatus(repository, sha, "failure", "the review could not be posted");
-      else {
-        setCommitStatus(
-          repository,
-          sha,
-          "success",
-          importants > 0 ? `${importants} important finding(s)` : "no blocking issues",
-        );
-      }
-    } else {
+    if (!sha) {
       warn("no commit sha; skipping the claude-review status");
+    } else if (failure) {
+      setCommitStatus(repository, sha, "failure", failure);
+    } else if (partial) {
+      process.stdout.write("partial pass; leaving the claude-review status as it is\n");
+    } else {
+      setCommitStatus(repository, sha, "success", outcome);
+    }
+    // The workflow puts this reaction on the `@claude review` comment; a local
+    // run has no step to hand it to.
+    if (env.GITHUB_OUTPUT) {
+      const reaction = failure ? "confused" : importants > 0 ? "-1" : partial ? "+1" : "rocket";
+      appendFileSync(env.GITHUB_OUTPUT, `reaction=${reaction}\n`);
     }
     const output = env.REVIEW_POSTED_OUTPUT ?? "posted.json";
     writeFileSync(output, `${JSON.stringify({ comments_posted: posted }, null, 2)}\n`);
