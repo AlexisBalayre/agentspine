@@ -52,8 +52,12 @@ function fileDiff(mergeBase: string, file: string): string {
     // repo-relative path would match nothing and quietly send every finding to the
     // summary instead of the diff.
     // Two-dot from the resolved merge base, never three-dot from `origin/main`,
-    // which the action's depth-1 base fetch grafts parentless.
-    return execFileSync("git", ["diff", `${mergeBase}..HEAD`, "--unified=0", "--", `:/${file}`], { encoding: "utf8" });
+    // which the action's depth-1 base fetch grafts parentless. --text: the
+    // checkout is the PR head, whose .gitattributes can mark a file -diff, and a
+    // "Binary files differ" has no hunk to anchor on.
+    return execFileSync("git", ["diff", "--text", `${mergeBase}..HEAD`, "--unified=0", "--", `:/${file}`], {
+      encoding: "utf8",
+    });
   } catch {
     warn(`could not diff ${file}; its findings go in the review body`);
     return "";

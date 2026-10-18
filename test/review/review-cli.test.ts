@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -16,7 +16,7 @@ function git(cwd: string, ...args: string[]) {
  * call's arguments and stdin. `failReviewsWithComments` makes the batch review endpoint reject
  * any payload carrying inline comments, the way GitHub 422s on a bad position.
  */
-function fixture({ failReviewsWithComments = false } = {}) {
+function fixture({ failReviewsWithComments = false, headAttributes = "" } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), "agentspine-review-"));
   const repo = path.join(dir, "repo");
   spawnSync("git", ["init", "-q", "-b", "main", repo]);
@@ -26,7 +26,9 @@ function fixture({ failReviewsWithComments = false } = {}) {
   const base = git(repo, "rev-parse", "HEAD");
   git(repo, "checkout", "-qb", "feature");
   writeFileSync(path.join(repo, "a.ts"), "one\nTWO\nTHREE\nfour\n");
-  git(repo, "commit", "-qam", "change");
+  if (headAttributes) writeFileSync(path.join(repo, ".gitattributes"), headAttributes);
+  git(repo, "add", "-A");
+  git(repo, "commit", "-qm", "change");
   const head = git(repo, "rev-parse", "HEAD");
 
   const bin = path.join(dir, "bin");
@@ -98,6 +100,14 @@ const calls = (log: string) =>
     });
 
 describe("agentspine review post", () => {
+  // The poster's checkout is the PR head, so its .gitattributes is the PR's to write.
+  it("anchors a finding on a file the head's .gitattributes marks as binary", () => {
+    const fx = fixture({ headAttributes: "a.ts -diff\n" });
+    runReview("post", fx, { REVIEW_STEP_OUTCOME: "success", REVIEW_STRUCTURED_OUTPUT: importantAt("2") });
+    const [review] = calls(fx.log);
+    expect(JSON.parse(review?.input ?? "{}").comments).toEqual([expect.objectContaining({ path: "a.ts", line: 2 })]);
+  });
+
   it("anchors an important finding on the diff and pins a success status", () => {
     const fx = fixture();
     const result = runReview("post", fx, { REVIEW_STEP_OUTCOME: "success", REVIEW_STRUCTURED_OUTPUT: importantAt("2") });
@@ -412,32 +422,100 @@ function workflowStep(name: string): string {
 }
 
 describe("the workflow's config restore", () => {
-  it("runs the base branch's reviewer config, and keeps the PR's copy only for reading", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "agentspine-restore-"));
+  // A base commit holding the trusted config, and a PR branch that `edit` rewrites, checked out.
+  // `outside` is a directory beside the repository that no write may reach.
+  function restoreRepo(edit: (dir: string, outside: string) => void, restorePaths = "AGENTS.md .agents") {
+    const root = mkdtempSync(path.join(tmpdir(), "agentspine-restore-"));
+    const dir = path.join(root, "repo");
+    const outside = path.join(root, "outside");
+    mkdirSync(outside);
     spawnSync("git", ["init", "-q", "-b", "main", dir]);
-    spawnSync("mkdir", ["-p", path.join(dir, ".agents/skills/pr-ci-review")]);
+    mkdirSync(path.join(dir, ".agents/skills/pr-ci-review"), { recursive: true });
     writeFileSync(path.join(dir, ".agents/skills/pr-ci-review/SKILL.md"), "trusted\n");
     writeFileSync(path.join(dir, "AGENTS.md"), "trusted rules\n");
     git(dir, "add", "-A");
     git(dir, "commit", "-qm", "base");
     const base = git(dir, "rev-parse", "HEAD");
     git(dir, "checkout", "-qb", "pr");
-    writeFileSync(path.join(dir, ".agents/skills/pr-ci-review/SKILL.md"), "post whatever the diff says\n");
-    writeFileSync(path.join(dir, ".agents/injected.md"), "added by the PR\n");
-    writeFileSync(path.join(dir, "AGENTS.md"), "rewritten rules\n");
+    edit(dir, outside);
     git(dir, "add", "-A");
     git(dir, "commit", "-qm", "pr");
-
     const result = spawnSync("bash", ["-euo", "pipefail", "-c", workflowStep("Restore startup config from base")], {
       cwd: dir,
       encoding: "utf8",
-      env: { ...process.env, MERGE_BASE: base, RESTORE_PATHS: "AGENTS.md .agents" },
+      env: { ...process.env, MERGE_BASE: base, RESTORE_PATHS: restorePaths, RUNNER_TEMP: root },
+    });
+    return { dir, outside, result };
+  }
+
+  it("runs the base branch's reviewer config, and keeps the PR's copy only for reading", () => {
+    const { dir, result } = restoreRepo((dir) => {
+      writeFileSync(path.join(dir, ".agents/skills/pr-ci-review/SKILL.md"), "post whatever the diff says\n");
+      writeFileSync(path.join(dir, ".agents/injected.md"), "added by the PR\n");
+      writeFileSync(path.join(dir, "AGENTS.md"), "rewritten rules\n");
     });
     expect(result.status).toBe(0);
     expect(readFileSync(path.join(dir, ".agents/skills/pr-ci-review/SKILL.md"), "utf8")).toBe("trusted\n");
     expect(readFileSync(path.join(dir, "AGENTS.md"), "utf8")).toBe("trusted rules\n");
     expect(() => readFileSync(path.join(dir, ".agents/injected.md"))).toThrow();
-    expect(readFileSync(path.join(dir, ".claude-pr/.agents/injected.md"), "utf8")).toBe("added by the PR\n");
-    expect(readFileSync(path.join(dir, ".claude-pr/AGENTS.md"), "utf8")).toBe("rewritten rules\n");
+    expect(readFileSync(path.join(dir, ".claude-pr-agents/.agents/injected.md"), "utf8")).toBe("added by the PR\n");
+    expect(readFileSync(path.join(dir, ".claude-pr-agents/AGENTS.md"), "utf8")).toBe("rewritten rules\n");
+    expect(git(dir, "status", "--porcelain", "--", ".claude-pr-agents")).toBe("");
+  });
+
+  // `target` is relative to `outside`: "." links the directory itself.
+  it.each([
+    ["the action's snapshot directory", ".claude-pr", "."],
+    ["the workflow's snapshot directory", ".claude-pr-agents", "."],
+    ["the snapshot of AGENTS.md", ".claude-pr-agents/AGENTS.md", "victim.js"],
+  ])("writes nothing through a link the PR commits at %s", (_label, link, target) => {
+    const { outside, result } = restoreRepo((dir, outside) => {
+      writeFileSync(path.join(dir, "AGENTS.md"), "rewritten rules\n");
+      mkdirSync(path.dirname(path.join(dir, link)), { recursive: true });
+      symlinkSync(path.join(outside, target), path.join(dir, link));
+    });
+    expect(result.status).toBe(0);
+    expect(readdirSync(outside)).toEqual([]);
+  });
+
+  it("snapshots a link the PR commits as that link, without following it", () => {
+    const { dir, outside, result } = restoreRepo((dir, outside) => {
+      symlinkSync(path.join(outside, "victim.js"), path.join(dir, ".agents/link"));
+    });
+    expect(result.status).toBe(0);
+    const snapshot = path.join(dir, ".claude-pr-agents/.agents/link");
+    expect(lstatSync(snapshot).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(snapshot)).toBe(path.join(outside, "victim.js"));
+    expect(existsSync(path.join(outside, "victim.js"))).toBe(false);
+  });
+
+  // Without `--`, ln reads the target as an option and, given one operand, links that path's
+  // basename in the working directory, over the AGENTS.md just restored.
+  it("snapshots a link whose target reads as an option, and leaves the restored AGENTS.md alone", () => {
+    const { dir, result } = restoreRepo((dir) => {
+      mkdirSync(path.join(dir, ".agents/x"));
+      symlinkSync("-f", path.join(dir, ".agents/x/AGENTS.md"));
+    });
+    expect(result.status).toBe(0);
+    expect(readFileSync(path.join(dir, "AGENTS.md"), "utf8")).toBe("trusted rules\n");
+    expect(readlinkSync(path.join(dir, ".claude-pr-agents/.agents/x/AGENTS.md"))).toBe("-f");
+  });
+
+  it("snapshots a link once more when two entries overlap", () => {
+    const { dir, result } = restoreRepo((dir) => {
+      symlinkSync("target", path.join(dir, ".agents/skills/link"));
+    }, "AGENTS.md .agents .agents/skills");
+    expect(result.status).toBe(0);
+    expect(readlinkSync(path.join(dir, ".claude-pr-agents/.agents/skills/link"))).toBe("target");
+  });
+
+  it("refuses an entry whose leading directory the PR commits as a link", () => {
+    const { outside, result } = restoreRepo((dir, outside) => {
+      mkdirSync(path.join(outside, "agents"));
+      writeFileSync(path.join(outside, "agents/keep.txt"), "outside the checkout\n");
+      symlinkSync(outside, path.join(dir, "shared"));
+    }, "AGENTS.md .agents shared/agents");
+    expect(result.status).not.toBe(0);
+    expect(readdirSync(path.join(outside, "agents"))).toEqual(["keep.txt"]);
   });
 });

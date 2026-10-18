@@ -451,11 +451,15 @@ symlinks into `.agents/`, and `.claude/settings.json` runs hook adapters from `.
 none of that is covered by the action's list, so a PR could have supplied its own orchestrator,
 reviewer manifests or hook scripts to a job holding the review token. The emitted workflow extends
 the action's own treatment to `AGENTS.md` and `.agents/`, snapshotting the PR's copy under
-`.claude-pr/` for reviewers to read unexecuted. The list is the workflow's `RESTORE_PATHS`,
-because restoring a symlink does not restore what it points at: a repository whose
-`.agents/skills` links into another directory (this one links into `templates/`) must add that
-directory, or the PR's copy of a skill is still what runs. The test drives the workflow's own `run:` block, so
-the shell that ships is the shell asserted.
+`.claude-pr-agents/` for reviewers to read unexecuted. The first version used `.claude-pr/`, which
+the action empties before taking its own snapshot (`src/github/operations/restore-config.ts:280`
+at v1.0.237), so no reviewer ever saw those copies; it also copied them through the checkout,
+where the PR can commit the destination as a symlink into the action's own code. The snapshot is
+now written blob by blob from the head commit into a directory the step creates. The list is the
+workflow's `RESTORE_PATHS`, because restoring a symlink does not restore what it points at: a
+repository whose `.agents/skills` links into another directory (this one links into `templates/`)
+must add that directory, or the PR's copy of a skill is still what runs. The test drives the
+workflow's own `run:` block, so the shell that ships is the shell asserted.
 
 **The action gets the workflow token, not an app token.** `claude-code-action` exchanges its
 OAuth token for a GitHub App token, and that exchange 401s unless the workflow file on the PR is

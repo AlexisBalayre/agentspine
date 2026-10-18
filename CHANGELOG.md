@@ -81,6 +81,15 @@ repository means re-running `npx agentspine`.
 - A review step that reported success and left no structured output, as the action does when it
   skips itself, posted "not reviewed" but left the poster's step green and the record clean. Both
   now fail.
+- The CI review's reviewers never saw the PR's own `AGENTS.md` and `.agents/`. The workflow put
+  them under `.claude-pr/`, which `claude-code-action` empties before the model starts. They are
+  now in `.claude-pr-agents/`.
+- The workflow wrote that snapshot through the checkout, so a PR could commit `.claude-pr` as a
+  symlink and have its own `AGENTS.md` written wherever the link pointed, including into the
+  action's code, which the next step runs with the job's secrets. The snapshot is now written from
+  the head commit into a directory the step creates, and keeps a link the PR commits as a link.
+- A finding on a file the PR's `.gitattributes` marks `-diff` went to the review body instead of
+  the line: the poster's diff printed "Binary files differ", which has no line to anchor to.
 
 ### Security
 

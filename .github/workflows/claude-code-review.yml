@@ -41,7 +41,8 @@ env:
   # Config the model executes at startup, restored from the base branch below so a PR cannot
   # rewrite the reviewer that reviews it. Add any path the shared tree resolves through: if
   # `.agents/skills` is a symlink into another directory, that directory belongs here too,
-  # because restoring the link does not restore what it points at.
+  # because restoring the link does not restore what it points at. Name that directory, not a
+  # path through the link: an entry with a link in a leading component fails the review.
   RESTORE_PATHS: "AGENTS.md .agents templates"
 
 jobs:
@@ -197,15 +198,48 @@ jobs:
       # links to: the skills and reviewer agents this review runs, and the hook adapters
       # .claude/settings.json executes. Left alone, a PR could rewrite its own reviewer. Apply
       # the action's treatment to every RESTORE_PATHS entry: snapshot the head's copy for
-      # reviewers under .claude-pr/, then take the merge base's.
+      # reviewers, then take the merge base's. The snapshot goes to .claude-pr-agents/, since
+      # the action empties .claude-pr/ before taking its own. It is written blob by blob from
+      # the head commit into a directory made here, never copied through the checkout: the head
+      # can commit any path there as a symlink, and a copy onto one writes wherever it points,
+      # the action's own code included, which runs next with the job's secrets.
       - name: Restore startup config from base
         if: steps.pr-head.outputs.skip != 'true' && steps.preflight.outputs.skip != 'true'
         env:
           MERGE_BASE: ${{ steps.preflight.outputs.merge_base }}
         run: |
-          mkdir -p .claude-pr
+          # Separate commands: in an && list, bash -e skips mkdir after a failed rm and carries on.
+          rm -rf .claude-pr-agents
+          mkdir .claude-pr-agents
+          # Out of git status, where reviewers would read the snapshot as files the PR added.
+          exclude=$(git rev-parse --git-path info/exclude)
+          mkdir -p "$(dirname "$exclude")"
+          echo /.claude-pr-agents/ >> "$exclude"
           for path in ${RESTORE_PATHS}; do
-            if [ -e "$path" ]; then cp -R "$path" ".claude-pr/$path"; fi
+            # A tree never holds a link and a path beneath it, so no write below goes through one.
+            git ls-tree -r -z HEAD -- "$path" > "${RUNNER_TEMP}/pr-snapshot"
+            while IFS= read -r -d '' entry; do
+              read -r mode _ oid <<< "${entry%%$'\t'*}"
+              dest=".claude-pr-agents/${entry#*$'\t'}"
+              mkdir -p "$(dirname "$dest")"
+              # A gitlink (160000) names a commit, not a blob, so it has nothing to snapshot.
+              # -f: an overlapping entry already snapshotted this link. -n: replace that link
+              # rather than follow it into the directory it names.
+              case "$mode" in
+                120000) ln -sfn -- "$(git cat-file blob "$oid")" "$dest" ;;
+                100644 | 100755) git cat-file blob "$oid" > "$dest" ;;
+              esac
+            done < "${RUNNER_TEMP}/pr-snapshot"
+            # The removal below follows a link in a leading component, which the PR can commit,
+            # so such an entry fails the review instead of deleting outside the checkout.
+            parent=$path
+            while [ "$parent" != "${parent%/*}" ]; do
+              parent=${parent%/*}
+              if [ -L "$parent" ]; then
+                echo "::error::$parent is a link in the PR; refusing to restore $path through it"
+                exit 1
+              fi
+            done
             # Removed first: checking out the base's copy alone would keep files the PR added.
             rm -rf "$path"
             if git cat-file -e "${MERGE_BASE}:${path}" 2>/dev/null; then
