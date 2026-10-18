@@ -294,6 +294,7 @@ describe("the reaction the poster hands to the comment", () => {
     ["no important finding on a partial pass", verdict(), "true", "reaction=+1"],
     ["an important finding", verdict([UNANCHORED_IMPORTANT]), "false", "reaction=-1"],
     ["no verdict at all", "", "false", "reaction=confused"],
+    ["no verdict on a partial pass", "", "true", "reaction=confused"],
   ])("follows a round with %s", (_label, structuredOutput, partial, expected) => {
     expect(reaction(structuredOutput, partial).output).toContain(expected);
   });
