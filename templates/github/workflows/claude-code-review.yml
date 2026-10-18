@@ -26,8 +26,9 @@ on:
 
 env:
   NODE_VERSION: "22"
-  # The review tooling ships inside agentspine. Pinned, so the contract between this workflow,
-  # the pr-ci-review skill and the poster moves only when you re-scaffold.
+  # The review tooling ships inside agentspine, pinned because this workflow, the pr-ci-review
+  # skill and the poster share a contract. Re-running agentspine with --packs ci-review updates
+  # the skill but never rewrites this file, so delete it (and commit that) first to move all three.
   AGENTSPINE_VERSION: "__AGENTSPINE_VERSION__"
   # Config the model executes at startup, restored from the base branch below so a PR cannot
   # rewrite the reviewer that reviews it. Add any path the shared tree resolves through: if
@@ -94,7 +95,7 @@ jobs:
       # that cannot resolve and reviewers fall back to `git diff HEAD~1 HEAD`, which
       # silently reviews only the last commit of a multi-commit PR.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -103,9 +104,10 @@ jobs:
       # would take the record down with it (a review that died at checkout would
       # leave no artifact at all, invisible to the retro's mining).
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
 
       # --ignore-scripts: the install runs with this job's token in the environment.
       - name: Install review tooling
@@ -332,7 +334,7 @@ jobs:
         if: steps.pr-head.outputs.skip != 'true' && steps.preflight.outputs.skip != 'true'
         id: claude-review
         # SHA-pinned (secrets + write token); the tag comment tracks the version.
-        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1.0.251
         # pr-ci-review spawns reviewers by the `opus` / `sonnet` aliases; these pin
         # the aliases to exact ids, so a Claude Code bump cannot move a tier
         # silently, while a local /pr-ci-review still follows the local defaults.
@@ -403,7 +405,7 @@ jobs:
 
       - name: Upload the review output
         if: always() && steps.pr-head.outputs.skip != 'true' && steps.preflight.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: review-output
           path: ${{ runner.temp }}/review-output/
@@ -430,14 +432,15 @@ jobs:
       # Full history: anchoring a finding to a line means diffing the reviewed commit against the
       # merge base, and a shallow checkout cannot resolve it.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
 
       # --ignore-scripts: the install runs with this job's token in the environment.
       - name: Install review tooling
@@ -461,7 +464,7 @@ jobs:
       - name: Download the review output
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: review-output
           path: ${{ runner.temp }}/review-output
@@ -521,7 +524,7 @@ jobs:
 
       - name: Upload review metrics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: review-metrics
           path: ${{ runner.temp }}/review-metrics.json
@@ -547,7 +550,7 @@ jobs:
       - name: Download review metrics
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: review-metrics
           path: ${{ runner.temp }}/review-metrics

@@ -2,6 +2,7 @@
 # scripts/audit-authors.sh fails CI on anything else, so a stray git config
 # cannot publish a commit under another account.
 alexis@balayre.com
-# GitHub's own identities: the merge-commit author and the Actions bot.
+# GitHub's own identities: the merge-commit author, the Actions bot, and Dependabot.
 noreply@github.com
 41898282+github-actions[bot]@users.noreply.github.com
+49699333+dependabot[bot]@users.noreply.github.com

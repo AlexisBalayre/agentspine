@@ -104,7 +104,7 @@ jobs:
       # that cannot resolve and reviewers fall back to `git diff HEAD~1 HEAD`, which
       # silently reviews only the last commit of a multi-commit PR.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -113,9 +113,10 @@ jobs:
       # would take the record down with it (a review that died at checkout would
       # leave no artifact at all, invisible to the retro's mining).
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
 
       # Built from the base branch, never from the PR head: here the review tooling is the code
       # under review. --ignore-scripts because the install runs with this job's token in the
@@ -354,7 +355,7 @@ jobs:
         if: steps.pr-head.outputs.skip != 'true' && steps.preflight.outputs.skip != 'true'
         id: claude-review
         # SHA-pinned (secrets + write token); the tag comment tracks the version.
-        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1.0.251
         # pr-ci-review spawns reviewers by the `opus` / `sonnet` aliases; these pin
         # the aliases to exact ids, so a Claude Code bump cannot move a tier
         # silently, while a local /pr-ci-review still follows the local defaults.
@@ -425,7 +426,7 @@ jobs:
 
       - name: Upload the review output
         if: always() && steps.pr-head.outputs.skip != 'true' && steps.preflight.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: review-output
           path: ${{ runner.temp }}/review-output/
@@ -452,14 +453,15 @@ jobs:
       # Full history: anchoring a finding to a line means diffing the reviewed commit against the
       # merge base, and a shallow checkout cannot resolve it.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
 
       # Built from the base branch, never from the PR head: here the review tooling is the code
       # under review. --ignore-scripts because the install runs with this job's token in the
@@ -495,7 +497,7 @@ jobs:
       - name: Download the review output
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: review-output
           path: ${{ runner.temp }}/review-output
@@ -555,7 +557,7 @@ jobs:
 
       - name: Upload review metrics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: review-metrics
           path: ${{ runner.temp }}/review-metrics.json
@@ -581,7 +583,7 @@ jobs:
       - name: Download review metrics
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: review-metrics
           path: ${{ runner.temp }}/review-metrics

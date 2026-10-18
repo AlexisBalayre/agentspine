@@ -137,7 +137,27 @@ the run.
 
 The workflow's deterministic steps are `agentspine review preflight|schema|post|metrics`, installed
 from npm at the version that scaffolded the file, so the repository gets a workflow and no
-toolchain of its own. Re-scaffold to move that pin.
+toolchain of its own. The workflow, the `pr-ci-review` skill and that tooling share a contract, and
+re-running with `--packs ci-review` updates the skill but never rewrites an existing workflow. To
+upgrade all three, delete the workflow and commit that, re-run
+`npx agentspine --yes --packs ci-review,<every other pack you use>`, then re-apply any edits you had
+made to the workflow.
+
+The `anthropics/claude-code-action` pin also fixes which Claude Code runs the review, since the
+action bundles it; the [capability matrix](docs/capability-matrix.md#the-ci-reviews-lock-claude-code)
+records which version. To follow Claude Code releases, let Dependabot bump the workflow's actions.
+It changes the action pins only, never the tooling version, and its pull requests get no review,
+because its author is none of the associations below:
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+```
 
 Two setup steps, both in the comment at the top of the emitted workflow: add the
 `CLAUDE_CODE_OAUTH_TOKEN` secret, and create the `ci/review-metrics` orphan branch that stores each

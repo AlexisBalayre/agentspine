@@ -3,8 +3,10 @@
 Notable changes to what `agentspine` ships. Changes to this repository that never reach a
 scaffolded tree — CI gates, contributor tooling, the design record — are not listed here.
 
-The emitted CI review workflow pins the version that scaffolded it, so upgrading a scaffolded
-repository means re-running `npx agentspine`.
+The emitted CI review workflow pins the version that scaffolded it, and a re-scaffold never
+rewrites an existing workflow, so upgrading a scaffolded repository's review means deleting that
+workflow and committing the deletion, then re-running
+`npx agentspine --yes --packs ci-review,<every other pack it uses>`.
 
 ## Unreleased
 
@@ -53,7 +55,12 @@ repository means re-running `npx agentspine`.
 - The emitted review workflow runs its orchestrator on Opus 5.5 instead of Sonnet 5, and pins the
   `opus` and `sonnet` aliases the reviewers are spawned with to `claude-opus-5-5` and
   `claude-sonnet-5-5`, so a Claude Code bump cannot move a tier silently. A review costs more per
-  run. It runs through `claude-code-action` v1.0.237.
+  run.
+- The emitted review workflow runs `claude-code-action` v1.0.251, which bundles Claude Code
+  2.1.301, and `actions/checkout` v7, `actions/setup-node` v7, `actions/upload-artifact` v7 and
+  `actions/download-artifact` v8. A download whose hash does not match now fails instead of
+  warning. setup-node's automatic npm cache is turned off: it keys on the repository's own
+  lockfile, from which the review installs nothing.
 - `.claude/agents/` is now a directory of real files, not a link to `.agents/agents/`: each shared
   reviewer manifest, plus the keys only Claude Code reads. `review-correctness`, `review-security`
   and `review-validator` ask for `effort: high` there. The key stays out of the shared manifests
@@ -61,8 +68,8 @@ repository means re-running `npx agentspine`.
   replaces the old link. An edit under `.agents/agents/` no longer reaches Claude Code.
 - The review record carries `reviewers_returned`, and the metrics record `incomplete_reason`; the
   metrics `schema_version` is now 2. The workflow, the `pr-ci-review` skill and the tooling move
-  together, so re-scaffold rather than bumping the workflow's pin by hand: the new tooling rejects
-  a record from the old skill as not reviewed.
+  together, so upgrade as the note at the top says rather than bumping the workflow's pin by
+  hand: the new tooling rejects a record from the old skill as not reviewed.
 
 ### Removed
 
