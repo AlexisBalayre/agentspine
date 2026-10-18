@@ -1,0 +1,99 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T14:50:24.628Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39137614778",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39137614778",
+  "actor": "AlexisBalayre",
+  "commit_sha": "890d5859c6a7a4a3b9350f2f6ebf0a55c025c967",
+  "source": "pr",
+  "pr_number": 41,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "security",
+    "context",
+    "maintainability",
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "09d8c6a26dfbefbe7861c2d2c6a446682d50f948",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "40",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "With `2>/dev/null` gone, `gh repo view` prints its error on every fetched run in `<name>` mode too, for example 'gh: command not found' or 'gh auth login'. When the origin-ancestor fallback then deletes the branch, the run succeeds but shows an unexplained error. Silence it outside `--merged`, or follow it with a 'merged-PR check skipped' note.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/worktree.test.ts",
+      "line": "346",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The new `gh: not signed in` assertion is met by the `gh repo view` call alone, because `gh pr list` never runs when TRUNK is empty. No test covers a gh that answers `repo view` and then fails `pr list`, so putting back the `2>/dev/null` on line 84 would go unnoticed.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "CHANGELOG.md",
+      "line": "50-51",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "'A dot-named worktree' could be read as any name containing a dot, but `v1.2` is still accepted. Only a leading `.` is rejected, so 'A worktree whose name starts with `.`' is more precise.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 0.7112477000000001,
+  "duration_ms": 77750,
+  "num_turns": 8,
+  "tokens": {
+    "input": 10,
+    "output": 5429,
+    "cache_read": 181900,
+    "cache_creation": 35727,
+    "total": 223066
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 16,
+      "output": 8898,
+      "cache_read": 231953,
+      "cache_creation": 55065,
+      "cost_usd": 0.6069206000000001
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 10,
+      "output": 1954,
+      "cache_read": 78871,
+      "cache_creation": 30752,
+      "cost_usd": 0.1043271
+    }
+  ],
+  "permission_denials": []
+}
