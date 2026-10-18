@@ -92,7 +92,8 @@ rather than repeating it.
 - The quality gate reads \`.agents/quality.toml\`.
 - Work on a change in its own worktree: \`.agents/scripts/worktree-create.sh <name>\`, configured by
   \`.agents/worktree.env\`. \`.agents/scripts/worktree-remove.sh <name>\` removes one, and its branch
-  once no work is lost; \`.agents/scripts/worktree-clean.sh\` force-removes those whose branch merged.
+  once no work is lost; \`--merged\` in place of names does the same for every worktree whose PR
+  merged into the default branch.
 - Hook policies are shared shell scripts; each tool has a thin adapter in
   \`.agents/hooks/adapters/\`. The contract is \`.agents/hooks/CONTRACT.md\`.
 
@@ -104,7 +105,7 @@ const WORKTREE_ENV = `# Read by the worktree scripts in .agents/scripts/. Source
 #
 # WORKTREE_INSTALL        run inside each new worktree, which starts with no dependencies
 #                         installed; empty skips it. A failing command fails the create.
-# WORKTREE_BRANCH_PREFIX  new branches are <prefix>/<name>; remove and clean delete no other branch
+# WORKTREE_BRANCH_PREFIX  new branches are <prefix>/<name>; remove touches no other branch
 
 WORKTREE_INSTALL=""
 WORKTREE_BRANCH_PREFIX="feature"

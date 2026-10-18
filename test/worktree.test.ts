@@ -1,11 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const CREATE = path.resolve("templates/agents/scripts/worktree-create.sh");
-const CLEAN = path.resolve("templates/agents/scripts/worktree-clean.sh");
 const REMOVE = path.resolve("templates/agents/scripts/worktree-remove.sh");
 const TSX = path.resolve("node_modules/.bin/tsx");
 const CLI = path.resolve("src/cli.ts");
@@ -39,12 +38,13 @@ function run(script: string, cwd: string, ...args: string[]) {
 
 /**
  * Runs worktree-remove.sh with `gh` replaced by a stub, so no test reaches the real forge: the
- * stub's body decides what a merged-PR lookup answers. `exit 1` stands for a gh that is missing
- * or not signed in.
+ * stub names `main` as the default branch, and its body decides what a merged-PR lookup answers.
+ * `NO_GH` stands for a gh that is missing or not signed in.
  */
 function remove(cwd: string, ghBody: string, ...names: string[]) {
   const bin = mkdtempSync(path.join(tmpdir(), "agentspine-gh-"));
-  writeFileSync(path.join(bin, "gh"), `#!/usr/bin/env bash\n${ghBody}\n`);
+  const defaultBranch = ghBody === NO_GH ? "" : 'if [ "$1 $2" = "repo view" ]; then echo main; exit 0; fi\n';
+  writeFileSync(path.join(bin, "gh"), `#!/usr/bin/env bash\n${defaultBranch}${ghBody}\n`);
   chmodSync(path.join(bin, "gh"), 0o755);
   const result = spawnSync("bash", [REMOVE, ...names], {
     cwd,
@@ -54,7 +54,7 @@ function remove(cwd: string, ghBody: string, ...names: string[]) {
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-const NO_GH = "exit 1";
+const NO_GH = "echo 'gh: not signed in' >&2; exit 1";
 
 /** A worktree on `feature/<name>` carrying one commit of its own. */
 function worktreeWithCommit(repo: string, name: string) {
@@ -102,19 +102,12 @@ describe("worktree scripts", () => {
     expect(run(CREATE, repo, "broken").status).not.toBe(0);
   });
 
-  it("removes only prefixed worktrees whose remote branch is gone", () => {
+  it.each(["../outside", "a/b", "-f", "a b", ".scratch"])("refuses %s as a worktree name", (name) => {
     const repo = repoWithOrigin();
-    run(CREATE, repo, "merged");
-    run(CREATE, repo, "open");
-    git(repo, "push", "-q", "origin", "feature/merged", "feature/open");
-    git(repo, "push", "-q", "origin", "--delete", "feature/merged");
-    git(repo, "worktree", "add", "-q", ".worktrees/other", "-b", "spike/other");
-
-    const { status } = run(CLEAN, repo);
-    expect(status).toBe(0);
-    expect(existsSync(path.join(repo, ".worktrees/merged"))).toBe(false);
-    expect(existsSync(path.join(repo, ".worktrees/open"))).toBe(true);
-    expect(existsSync(path.join(repo, ".worktrees/other"))).toBe(true);
+    const { status, stderr } = run(CREATE, repo, name);
+    expect(status).toBe(1);
+    expect(stderr).toContain("not a worktree name");
+    expect(git(repo, "worktree", "list", "--porcelain").stdout.match(/^worktree /gm)).toHaveLength(1);
   });
 });
 
@@ -181,15 +174,26 @@ describe("worktree-remove", () => {
     expect(existsSync(dir)).toBe(true);
   });
 
-  it("never deletes a branch outside the configured prefix", () => {
+  // .worktrees/ can hold worktrees another tool made, and a clean one would otherwise go.
+  it("keeps a worktree on a branch outside the configured prefix, and the branch", () => {
     const repo = repoWithOrigin('WORKTREE_BRANCH_PREFIX="wt"\n');
     git(repo, "worktree", "add", "-q", ".worktrees/spike", "-b", "spike/other");
     git(repo, "push", "-q", "origin", "spike/other");
 
     const { stderr } = remove(repo, NO_GH, "spike");
-    expect(existsSync(path.join(repo, ".worktrees/spike"))).toBe(false);
+    expect(existsSync(path.join(repo, ".worktrees/spike"))).toBe(true);
     expect(hasBranch(repo, "spike/other")).toBe(true);
-    expect(stderr).toContain("not a wt/ branch");
+    expect(stderr).toContain("spike/other is not a wt/ branch");
+  });
+
+  it("refuses a name that reaches outside .worktrees/", () => {
+    const repo = repoWithOrigin();
+    run(CREATE, repo, "here");
+    git(repo, "worktree", "add", "-q", path.join(repo, "..", "sibling"), "-b", "feature/sibling");
+
+    const { stderr } = remove(repo, NO_GH, "../../sibling");
+    expect(existsSync(path.join(repo, "..", "sibling"))).toBe(true);
+    expect(stderr).toContain("not a worktree name");
   });
 
   it("removes clean worktrees but keeps every branch when the fetch fails, since a stale ref could vouch", () => {
@@ -223,11 +227,25 @@ describe("worktree-remove", () => {
     git(repo, "push", "-q", "origin", "main");
     const { tip } = worktreeWithCommit(repo, "autodeleted");
     git(repo, "push", "-q", "origin", "feature/autodeleted");
-    git(repo, "push", "-q", "origin", "--delete", "feature/autodeleted");
+    // On origin itself, so the clone keeps the stale tracking ref a forge's delete leaves.
+    git(path.join(repo, "..", "origin.git"), "update-ref", "-d", "refs/heads/feature/autodeleted");
 
     const { status, stderr } = remove(repo, `echo ${tip}`, "autodeleted");
     expect(status, stderr).toBe(0);
     expect(hasBranch(repo, "feature/autodeleted")).toBe(false);
+    expect(stderr).not.toContain("delete refused");
+  });
+
+  // A stacked PR merges into its parent's branch, which has not reached the default branch.
+  it("keeps a branch whose PR merged into another branch, not the default one", () => {
+    const repo = repoWithOrigin();
+    git(repo, "push", "-q", "origin", "main");
+    const { tip } = worktreeWithCommit(repo, "stacked");
+    const intoParentOnly = `case "$*" in *"--base main"*) ;; *) echo ${tip} ;; esac`;
+
+    const { stderr } = remove(repo, intoParentOnly, "stacked");
+    expect(hasBranch(repo, "feature/stacked")).toBe(true);
+    expect(stderr).toContain("no merged PR shipped it");
   });
 
   // A short name would match the tag too, and git refuses a push whose destination is ambiguous.
@@ -284,6 +302,86 @@ describe("worktree-remove", () => {
   });
 });
 
+describe("worktree-remove --merged", () => {
+  it("removes every worktree whose tip a merged PR shipped, and keeps the rest", () => {
+    const repo = repoWithOrigin();
+    git(repo, "push", "-q", "origin", "main");
+    const shipped = worktreeWithCommit(repo, "shipped");
+    git(repo, "push", "-q", "origin", "feature/shipped");
+    const open = worktreeWithCommit(repo, "open");
+    git(repo, "push", "-q", "origin", "feature/open");
+    git(repo, "worktree", "add", "-q", ".worktrees/other", "-b", "spike/other");
+
+    const { status, stderr } = remove(repo, `echo ${shipped.tip}`, "--merged");
+    expect(status, stderr).toBe(0);
+    expect(existsSync(shipped.dir)).toBe(false);
+    expect(hasBranch(repo, "feature/shipped")).toBe(false);
+    expect(originHas(repo, "feature/shipped")).toBe(false);
+    expect(existsSync(open.dir)).toBe(true);
+    expect(hasBranch(repo, "feature/open")).toBe(true);
+    expect(stderr).toContain("Kept .worktrees/open: no PR merged into main has its tip as head");
+    expect(existsSync(path.join(repo, ".worktrees/other"))).toBe(true);
+  });
+
+  it("keeps a shipped worktree that has uncommitted files", () => {
+    const repo = repoWithOrigin();
+    git(repo, "push", "-q", "origin", "main");
+    const { dir, tip } = worktreeWithCommit(repo, "dirty");
+    writeFileSync(path.join(dir, "scratch.txt"), "unsaved\n");
+
+    remove(repo, `echo ${tip}`, "--merged");
+    expect(existsSync(path.join(dir, "scratch.txt"))).toBe(true);
+    expect(hasBranch(repo, "feature/dirty")).toBe(true);
+  });
+
+  it("removes nothing when gh cannot answer, and says so", () => {
+    const repo = repoWithOrigin();
+    const { dir } = worktreeWithCommit(repo, "unknown");
+    git(repo, "push", "-q", "origin", "feature/unknown");
+
+    const { status, stderr } = remove(repo, NO_GH, "--merged");
+    expect(status).toBe(1);
+    expect(existsSync(dir)).toBe(true);
+    expect(stderr).toContain("gh could not say whether a merged PR shipped its tip");
+    expect(stderr).toContain("gh: not signed in");
+  });
+
+  it("keeps a worktree git cannot read, and carries on with the rest", () => {
+    const repo = repoWithOrigin();
+    git(repo, "push", "-q", "origin", "main");
+    const stale = worktreeWithCommit(repo, "a-stale");
+    const shipped = worktreeWithCommit(repo, "b-shipped");
+    rmSync(path.join(repo, ".git/worktrees/a-stale"), { recursive: true });
+
+    const { status, stderr } = remove(repo, `echo ${shipped.tip}`, "--merged");
+    expect(status, stderr).toBe(0);
+    expect(stderr).toContain("Kept .worktrees/a-stale: git cannot read it as a worktree");
+    expect(existsSync(stale.dir)).toBe(true);
+    expect(existsSync(shipped.dir)).toBe(false);
+  });
+
+  it("fails without removing anything when the fetch fails", () => {
+    const repo = repoWithOrigin();
+    const { dir, tip } = worktreeWithCommit(repo, "offline");
+    git(repo, "remote", "set-url", "origin", path.join(repo, "..", "gone.git"));
+
+    const { status } = remove(repo, `echo ${tip}`, "--merged");
+    expect(status).not.toBe(0);
+    expect(existsSync(dir)).toBe(true);
+  });
+
+  it.each([
+    ["--merged", "extra"],
+    ["extra", "--merged"],
+  ])("takes no names alongside the flag (%s %s)", (...args) => {
+    const repo = repoWithOrigin();
+    const { dir, tip } = worktreeWithCommit(repo, "extra");
+    git(repo, "push", "-q", "origin", "feature/extra");
+    expect(remove(repo, `echo ${tip}`, ...args).status).toBe(1);
+    expect(existsSync(dir)).toBe(true);
+  });
+});
+
 describe("init emits the worktree setup", () => {
   it("installs executable scripts, a config to fill, and ignores the worktree directory", () => {
     const repo = repoWithOrigin();
@@ -293,9 +391,10 @@ describe("init emits the worktree setup", () => {
     git(repo, "commit", "-qm", "tools");
     spawnSync(TSX, [CLI, "--dir", repo, "--yes", "--skip-hooks"], { encoding: "utf8" });
 
-    for (const script of ["worktree-create.sh", "worktree-clean.sh", "worktree-remove.sh"]) {
+    for (const script of ["worktree-create.sh", "worktree-remove.sh"]) {
       expect(statSync(path.join(repo, ".agents/scripts", script)).mode & 0o111).not.toBe(0);
     }
+    expect(existsSync(path.join(repo, ".agents/scripts/worktree-clean.sh"))).toBe(false);
     expect(existsSync(path.join(repo, ".agents/worktree.env"))).toBe(true);
     const ignore = readFileSync(path.join(repo, ".gitignore"), "utf8");
     expect(ignore).toContain("node_modules/");

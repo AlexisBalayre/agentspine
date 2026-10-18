@@ -36,7 +36,7 @@ three times, a hook wired four ways, a convention updated in one file and stale 
 ├── hooks/
 │   ├── policies/    # tool-agnostic shell: git safety, quality gate, naming
 │   └── adapters/    # per-tool input parsing and exit-code mapping
-├── scripts/         # worktree-create.sh, worktree-remove.sh, worktree-clean.sh
+├── scripts/         # worktree-create.sh, worktree-remove.sh
 ├── worktree.env     # install command and branch prefix for new worktrees
 └── quality.toml     # per-path lint/typecheck commands, detection-seeded
 

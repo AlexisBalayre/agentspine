@@ -12,6 +12,12 @@ cd "$ROOT"
 PREFIX="${WORKTREE_BRANCH_PREFIX:-feature}"
 
 NAME="${1:?Usage: .agents/scripts/worktree-create.sh <name>}"
+# worktree-remove.sh holds names to the same rule, so it can remove whatever this creates.
+case "$NAME" in
+  '' | -* | .* | */* | *..* | *[!A-Za-z0-9._-]*)
+    echo "Error: '$NAME' is not a worktree name (letters, digits, . _ - only; no leading . or -)." >&2
+    exit 1 ;;
+esac
 WORKTREE_DIR=".worktrees/$NAME"
 BRANCH="$PREFIX/$NAME"
 

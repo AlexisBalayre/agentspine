@@ -395,6 +395,8 @@ host-neutral rewrite would have to invent (decision 7).
 
 ## 20. Worktree scripts, finally in core
 
+Amended by decision 33: `worktree-clean.sh` is gone; `worktree-remove.sh --merged` does its job.
+
 Date: 2026-09-17
 
 Decision 7 listed worktree scripts in `core`; they were never built. They now ship as
@@ -795,6 +797,9 @@ review-pipeline changes (decision 31). Each is its own port.
 
 ## 30. Removing a worktree without losing its branch
 
+Amended by decision 33: a worktree on a branch outside the prefix is kept, a name is checked, and
+only a pull request into the default branch counts as shipped.
+
 Date: 2026-10-18
 
 The template now ships the reverse of `worktree-create.sh`, and it comes into core beside the other
@@ -965,3 +970,39 @@ jobs install nothing from that lockfile, and setup-node's README recommends turn
 in workflows holding sensitive credentials, so every `setup-node` step sets
 `package-manager-cache: false`. This differs from the template, which caches its own tooling's
 lockfile on purpose.
+
+## 33. `worktree-clean.sh` folds into `worktree-remove.sh --merged`
+
+Date: 2026-10-18
+
+The template retired `worktree-clean.sh` for `worktree-remove.sh --merged`, and agentspine follows.
+Clean force-removed every prefixed worktree whose remote branch was gone, uncommitted files
+included, and left the local branch behind. A forge that deletes a branch on merge makes "gone"
+the common case, so it was the script most likely to lose work. `--merged` takes the worktrees
+whose tip a merged pull request shipped, and applies remove's rules to each.
+
+Three holes in remove come with it, each with a test watched failing:
+
+- The prefix check ran after `git worktree remove`, so a clean worktree another tool made under
+  `.worktrees/`, on a branch of its own, was removed. It now runs first, and keeps that worktree.
+- A name was not checked, so `../../sibling` removed a worktree outside `.worktrees/`. Remove and
+  create now take letters, digits, `.`, `_` and `-` only, never a leading `.` or `-`. The `--merged`
+  glob skips dot-named directories, so a leading dot would make a worktree it never visits.
+- Any merged pull request counted, including a stacked one merged into its parent's branch, whose
+  commits had not reached the trunk. Only a pull request into the default branch counts now.
+
+- **The default branch comes from the forge**, through `gh repo view`, instead of the template's
+  `GIT_TRUNK`. agentspine keeps the trunk in the `AGENTS.md` project map, which a shell script
+  should not parse, and a new `worktree.env` key would not reach the copies already written, since
+  that file is never overwritten. "Did this ship" is GitHub's question either way, asked through
+  the same `gh`.
+
+- **Cost accepted:** a repository scaffolded earlier keeps its `worktree-clean.sh`, since
+  re-scaffolding deletes nothing, as with `resolving-merge-conflicts`. Its `AGENTS.md` bullet
+  stops naming the script once a re-scaffold rewrites the managed block.
+- **Cost accepted:** in a repository whose trunk is not its default branch, no pull request into
+  the trunk counts as shipped, so a squash-merged branch is kept until someone deletes it by hand.
+- **Cost accepted:** a tip that a merged pull request holds only as an ancestor of its head, as
+  after the forge's "Update branch" or an accepted suggestion, does not count as shipped. `--merged`
+  keeps that worktree and says to pull and retry. Counting an ancestor would need the merged head
+  locally, which a squash merge whose branch the forge deleted never provides.

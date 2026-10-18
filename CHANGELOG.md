@@ -20,12 +20,13 @@ workflow and committing the deletion, then re-running
   ready once every ticket lands. It is reviewed by the CI review where the repository runs it, and
   by `review-changes` otherwise.
 - `.agents/scripts/worktree-remove.sh <name>...` removes the named worktrees, and deletes each
-  one's branch once no work is lost: a merged pull request shipped its tip, or origin's copy holds
-  every commit. Origin's copy goes too on the merged-PR path, unless the branch moved past the
-  merged tip. A worktree with uncommitted or untracked files, or a detached HEAD, is kept, and so
-  is any branch outside `WORKTREE_BRANCH_PREFIX` or any branch at all when the fetch fails. The
-  merged-PR check needs an authenticated `gh`; without one, only origin's copy vouches for a
-  branch. `worktree-clean.sh` is unchanged and still force-removes.
+  one's branch once no work is lost: a pull request merged into the default branch shipped its
+  tip, or origin's copy holds every commit. Origin's copy goes too on the merged-PR path, unless
+  the branch moved past the merged tip. A worktree with uncommitted or untracked files, a detached
+  HEAD, or a branch outside `WORKTREE_BRANCH_PREFIX` is kept, and so is every branch when the
+  fetch fails. The merged-PR check needs an authenticated `gh`; without one, only origin's copy
+  vouches for a branch. `--merged` in place of names does the same for every worktree whose tip a
+  merged pull request shipped, keeps the rest, and exits 1 when the fetch or `gh` cannot answer.
 - A `review-spec` reviewer in the `review` pack, which holds a change against the issue or spec it
   implements: requirements missing, partial or built wrong, and work no requirement asked for.
   `pr-ci-review` spawns it when the PR closes an issue, `review-changes` when the change names a
@@ -44,6 +45,10 @@ workflow and committing the deletion, then re-running
 
 ### Changed
 
+- `worktree-create.sh` takes a name of letters, digits, `.`, `_` and `-` only, not starting with
+  `.` or `-`, so a name cannot place a worktree outside `.worktrees/`, or where `--merged` never
+  looks. A dot-named worktree an earlier release created is out of both scripts' reach: remove it
+  with `git worktree remove .worktrees/<name>`.
 - `planning` now installs `review` as well, since `implement-spec` invokes `pr-description` and
   `review-changes`. `--packs planning` therefore also installs the seven reviewer agents.
 - The wizard's `template.sh` writes values single-quoted and reads them back intact, writes
@@ -73,6 +78,10 @@ workflow and committing the deletion, then re-running
 
 ### Removed
 
+- `worktree-clean.sh`, which force-removed every prefixed worktree whose remote branch was gone,
+  uncommitted files included, and left its branch behind. `worktree-remove.sh --merged` does that
+  job without losing work. Re-scaffolding does not delete it: a repository scaffolded earlier keeps
+  `.agents/scripts/worktree-clean.sh` until it is removed by hand.
 - `resolving-merge-conflicts`, retired upstream. Re-scaffolding does not delete it: a repository
   scaffolded earlier keeps `.agents/skills/resolving-merge-conflicts/` until it is removed by hand.
 
