@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -479,10 +479,31 @@ describe("git-safety reads GIT_TRUNK from .env as data", () => {
   });
 
   // A policy that ends early turns off every rule, so a .env it cannot read must leave it running.
-  it("keeps guarding main when .env cannot be read", () => {
+  // Root reads the file whatever its mode, so there the test could not fail.
+  it.skipIf(process.getuid?.() === 0)("keeps guarding main when .env cannot be read", () => {
     const root = repoWithEnv("API_URL=http://localhost\n", "main");
     chmodSync(path.join(root, ".env"), 0o000);
     const { status, stderr } = commit(root);
+    expect(status).toBe(2);
+    expect(stderr).toContain("you are on main");
+  });
+
+  // Claude Code lets the command run when the hook outlasts its 5-second timeout, so reading all of
+  // a sparse 1 GiB .env, which takes seconds, would let a sandboxed command switch the policy off.
+  it("reads only the head of a huge .env, inside the hook's timeout", () => {
+    const root = repoWithEnv("", "main");
+    truncateSync(path.join(root, ".env"), 1024 ** 3);
+    const { status, stderr } = spawnSync("bash", [ADAPTER, "git-safety"], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse",
+        tool_name: "Bash",
+        cwd: root,
+        tool_input: { command: "git commit -m work" },
+      }),
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+      timeout: 5000,
+    });
     expect(status).toBe(2);
     expect(stderr).toContain("you are on main");
   });

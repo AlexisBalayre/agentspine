@@ -1046,23 +1046,26 @@ the user turns the sandbox on, and the deep merge keeps the user's own entries b
   links four of them into `templates/agents/` and denies that path too, held by
   `test/repo-settings.test.ts`.
 
-**git-safety reads `GIT_TRUNK` from `.env` as data.** It used to source the file, on every Bash
-call and outside the sandbox, and `.env` sits at the project root, outside `.agents/`. It now
-takes the value on the last `GIT_TRUNK=` line, with or without `export`: up to the closing quote
-when the value is quoted, up to the first whitespace when it is not. Nothing else in the file
-runs, and a file it cannot read leaves the trunk at `main` rather than ending the policy, which
-would turn off every rule.
-
-- **Rejected:** denying `./.env` as well. It is per-machine config that the `wizard` skill and
-  the project's own tooling write.
-- **Cost accepted:** a sandboxed command can still change which branch git-safety guards, by
-  writing `GIT_TRUNK` into `.env` or making the file unreadable.
-- **Cost accepted:** a `.env` that sets `GIT_TRUNK` with shell syntax, such as
-  `GIT_TRUNK=$DEFAULT_BRANCH`, now hands git-safety that text, not its value.
-
 - **Not closed here:** the gate runs the project's own tooling, which reads files a sandboxed
   command can still write: linter and type-checker configs, the `package.json` script behind
   `pnpm typecheck`, the `build.rs` behind `cargo check`, and the `node_modules/.bin` entry behind
   `npx tsc`. Those paths are the project's to deny.
 - **Cursor** has a sandbox but no setting that denies a write inside the workspace, which the
   matrix records as a gap. opencode and Mistral Vibe run commands without one.
+
+**git-safety reads `GIT_TRUNK` from `.env` as data.** It used to source the file, on every Bash
+call and outside the sandbox, and `.env` sits at the project root, outside `.agents/`. It now
+takes the value on the last `GIT_TRUNK=` line, with or without `export`: up to the closing quote
+when the value is quoted, up to the first whitespace when it is not. Nothing else in the file
+runs, and a file it cannot read leaves the trunk at `main` rather than ending the policy, which
+would turn off every rule. Only the first 64 KiB is read: Claude Code lets the call through when a
+`PreToolUse` hook outlasts its timeout (hooks reference, "Timeouts", read 2026-10-18), which is 5
+seconds here, and the unbounded read took 8 seconds on a sparse 1 GiB `.env` on macOS.
+
+- **Rejected:** denying `./.env` as well. It is per-machine config that the `wizard` skill and
+  the project's own tooling write.
+- **Cost accepted:** a sandboxed command can still change which branch git-safety guards, by
+  writing `GIT_TRUNK` into `.env` or making the file unreadable.
+- **Cost accepted:** a `.env` that sets `GIT_TRUNK` with shell syntax, such as
+  `GIT_TRUNK=$DEFAULT_BRANCH`, now hands git-safety that text, not its value, and a `GIT_TRUNK`
+  line past the first 64 KiB is not read.
