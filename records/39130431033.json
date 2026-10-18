@@ -1,0 +1,119 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T13:20:20.589Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39130431033",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39130431033",
+  "actor": "AlexisBalayre",
+  "commit_sha": "0e930ee890bf0350f0ceefb81c395e1433010c2a",
+  "source": "pr",
+  "pr_number": 38,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "191",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "important",
+      "description": "`ln -s \"$(git cat-file blob \"$oid\")\" \"$dest\"` takes the PR-committed link target as an argument with no `--`. A link whose target starts with `-` is read as `ln` options. The step can then create, or with `-f` overwrite, a symlink outside `.claude-pr-agents/` (in the repo root or any runner-writable directory). That breaks the step's own guarantee that nothing is written outside the snapshot directory.",
+      "body": "The snapshot loop passes the PR-controlled symlink target to `ln` with no `--` in front of it. Git stores any bytes as a link's target, so a PR can commit something like `.agents/x/AGENTS.md` as a link whose target is `-f`. The loop then runs:\n\n```sh\nln -s -f .claude-pr-agents/.agents/x/AGENTS.md\n```\n\nGNU `ln` given one operand creates `./AGENTS.md` in the workspace root. That replaces, with a dangling link, the `AGENTS.md` that the first `RESTORE_PATHS` pass (`AGENTS.md .agents`) just restored from the merge base. No later step restores it, so the review runs without the base's instructions that `CLAUDE.md` imports.\n\nA clustered `-ft<dir>` or `--target-directory=<dir>` places or overwrites a link in any directory the runner can write to, including the action's checkout under `_actions/`. The link always points at `.claude-pr-agents/<path>`, which `ln` never wrote, so the PR can't inject content this way. It can still delete or replace files outside the snapshot, which is the guarantee the step's comment (L166-L171) and the CHANGELOG entry state.\n\nNone of the new restore tests uses a link target that starts with `-`.\n\nhttps://github.com/AlexisBalayre/agentspine/blob/0e930ee890bf0350f0ceefb81c395e1433010c2a/templates/github/workflows/claude-code-review.yml#L191\n\nFix: end option parsing before the target, in this template and in the rendered `.github/workflows/claude-code-review.yml:213`, which `test/workflow-sync.test.ts` keeps in sync. A test committing a link with target `-f` would pin it.",
+      "suggestion": "                120000) ln -s -- \"$(git cat-file blob \"$oid\")\" \"$dest\" ;;"
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "213",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The rendered copy of the workflow has the same `ln -s` without `--` as the template, so a PR link target starting with `-` is parsed as `ln` options and can write a symlink outside `.claude-pr-agents/`, e.g. over the restored root `AGENTS.md`.",
+      "body": "This is the same defect as `templates/github/workflows/claude-code-review.yml:191`, in this repository's rendered workflow. `RESTORE_PATHS` here is `AGENTS.md .agents templates`, so a link target of `-f` under `.agents/` or `templates/` named `AGENTS.md` replaces the merge-base `AGENTS.md` restored in the first pass with a dangling link. `-ft<dir>` writes into any directory the runner can write to.\n\nhttps://github.com/AlexisBalayre/agentspine/blob/0e930ee890bf0350f0ceefb81c395e1433010c2a/.github/workflows/claude-code-review.yml#L213\n\nApply the same `--` fix as in the template; `test/workflow-sync.test.ts` requires the two copies to match.",
+      "suggestion": "                120000) ln -s -- \"$(git cat-file blob \"$oid\")\" \"$dest\" ;;"
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "204",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Adding `/.claude-pr-agents/` to `.git/info/exclude` also hides the snapshot from ripgrep-backed Grep/Glob, so reviewers can reach the PR's copies only by explicit-path Read; the skill could say so.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "211-213",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The snapshot loop's `case` silently skips gitlinks (160000) and any other mode. Skipping is the safe choice, but it is untested and unstated; a one-line why-comment would help.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "213",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`$(git cat-file blob \"$oid\")` strips trailing newlines from a link target, so a pathological target ending in a newline isn't reproduced byte for byte. There is no consequence for a read-only snapshot.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "458-460",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The edited decision 21 paragraph wasn't rewrapped: a line breaks short after \"a repository whose\". Reflow it to the file's width.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/review/review-cli.test.ts",
+      "line": null,
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The symlink `it.each` case picks the link target by `link.endsWith(\".md\")`, which hides the file-link and directory-link scenarios inside one body. Put the target kind in the table row instead.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 2,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 3.1017630499999997,
+  "duration_ms": 512748,
+  "num_turns": 12,
+  "tokens": {
+    "input": 10,
+    "output": 11412,
+    "cache_read": 165242,
+    "cache_creation": 38966,
+    "total": 215630
+  }
+}
