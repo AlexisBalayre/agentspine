@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -429,11 +429,11 @@ describe("git-safety follows cd and -C to the checkout a command runs in", () =>
  * sourcing it ran whatever such a command put there with the user's full access (decision 34).
  */
 describe("git-safety reads GIT_TRUNK from .env as data", () => {
-  function repoOnDevelop(env: string) {
+  function repoWithEnv(env: string, branch = "develop") {
     const root = mkdtempSync(path.join(tmpdir(), "agentspine-env-"));
     const git = (...args: string[]) =>
       spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
-    git("init", "-q", "-b", "develop");
+    git("init", "-q", "-b", branch);
     writeFileSync(path.join(root, "a.txt"), "x\n");
     git("add", "-A");
     git("commit", "-qm", "init");
@@ -460,18 +460,30 @@ describe("git-safety reads GIT_TRUNK from .env as data", () => {
     ["CRLF line endings, after another key", "API_URL=http://localhost\r\nGIT_TRUNK=develop\r\n"],
     ["the last of two values", "GIT_TRUNK=main\nGIT_TRUNK=develop\n"],
   ])("guards the trunk named by %s", (_label, env) => {
-    expect(commit(repoOnDevelop(env)).status).toBe(2);
+    expect(commit(repoWithEnv(env)).status).toBe(2);
   });
 
   it("guards main when .env names no trunk", () => {
-    expect(commit(repoOnDevelop("API_URL=http://localhost\n")).status).toBe(0);
+    expect(commit(repoWithEnv("API_URL=http://localhost\n")).status).toBe(0);
   });
 
+  // The last line makes the policy block, which shows it read the file rather than ending early.
   it("runs nothing written into .env", () => {
-    const root = repoOnDevelop("");
+    const root = repoWithEnv("");
     const marker = path.join(root, "ran");
-    writeFileSync(path.join(root, ".env"), `touch ${marker}\nGIT_TRUNK=$(touch ${marker})\n`);
-    commit(root);
+    writeFileSync(path.join(root, ".env"), `touch ${marker}\nGIT_TRUNK=$(touch ${marker})\nGIT_TRUNK=develop\n`);
+    const { status, stderr } = commit(root);
     expect(existsSync(marker)).toBe(false);
+    expect(status).toBe(2);
+    expect(stderr).toContain("you are on develop");
+  });
+
+  // A policy that ends early turns off every rule, so a .env it cannot read must leave it running.
+  it("keeps guarding main when .env cannot be read", () => {
+    const root = repoWithEnv("API_URL=http://localhost\n", "main");
+    chmodSync(path.join(root, ".env"), 0o000);
+    const { status, stderr } = commit(root);
+    expect(status).toBe(2);
+    expect(stderr).toContain("you are on main");
   });
 });

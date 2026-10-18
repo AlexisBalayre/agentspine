@@ -306,7 +306,10 @@ rows are honest about which claims are tested and which are read.
     fails with `unable to unlink old`"), https://code.claude.com/docs/en/settings-reference
     ("Sandbox path prefixes", `sandbox.filesystem.denyWrite`); source
     `anthropic-experimental/sandbox-runtime@626a596`, `src/sandbox/sandbox-utils.ts`
-  - The probe: sandbox-runtime 0.0.80 (tag `v0.0.80`, `626a596`) on macOS 26.6.2, 2026-10-18
+  - The probe behind "A deny reaches the path a write resolves to": sandbox-runtime 0.0.80 (tag
+    `v0.0.80`, `626a596`) on macOS 26.6.2, 2026-10-18. A `denyWrite` on `.agents` refused a
+    sandboxed write under it and one through `.claude/skills`, and let one through a link out of
+    it
   - Codex: source `openai/codex@8c07694`, `codex-rs/protocol/src/permissions.rs`,
     `codex-rs/hooks/src/engine/command_runner.rs`
   - Cursor: https://cursor.com/docs/reference/sandbox ("Protected paths"),

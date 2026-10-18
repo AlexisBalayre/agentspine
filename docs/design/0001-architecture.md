@@ -1024,14 +1024,6 @@ included: Claude Code loads skills from `.agents/skills` through the `.claude/sk
 is one, and the other four tools load theirs from `.agents/skills` directly. It does nothing until
 the user turns the sandbox on, and the deep merge keeps the user's own entries beside it.
 
-**git-safety reads `GIT_TRUNK` from `.env` as data.** It used to source the file, on every Bash
-call and outside the sandbox, and `.env` sits at the project root, outside `.agents/`. It now
-takes the last `GIT_TRUNK=` line, with or without `export`, strips one pair of quotes or a
-trailing comment, and runs nothing else in the file.
-
-- **Rejected:** denying `./.env` as well. It is per-machine config that the `wizard` skill and
-  the project's own tooling write.
-
 - **Rejected:** an `Edit(./.agents/**)` deny rule. Claude Code adds it to `denyWrite` as well, but
   it also stops Claude's Edit tool, which `adapt-to-project` uses to write `quality.toml` and
   `worktree.env`, and which `retro` uses to add a policy or a gate command.
@@ -1053,9 +1045,21 @@ trailing comment, and runs nothing else in the file.
   links into needs its own entry. A scaffolded `.agents/` holds real directories. This repository
   links four of them into `templates/agents/` and denies that path too, held by
   `test/repo-settings.test.ts`.
+
+**git-safety reads `GIT_TRUNK` from `.env` as data.** It used to source the file, on every Bash
+call and outside the sandbox, and `.env` sits at the project root, outside `.agents/`. It now
+takes the value on the last `GIT_TRUNK=` line, with or without `export`: up to the closing quote
+when the value is quoted, up to the first whitespace when it is not. Nothing else in the file
+runs, and a file it cannot read leaves the trunk at `main` rather than ending the policy, which
+would turn off every rule.
+
+- **Rejected:** denying `./.env` as well. It is per-machine config that the `wizard` skill and
+  the project's own tooling write.
 - **Cost accepted:** a sandboxed command can still change which branch git-safety guards, by
-  writing `GIT_TRUNK` into `.env`. A value written with shell syntax, such as `$(...)`, is now
-  read as text.
+  writing `GIT_TRUNK` into `.env` or making the file unreadable.
+- **Cost accepted:** a `.env` that sets `GIT_TRUNK` with shell syntax, such as
+  `GIT_TRUNK=$DEFAULT_BRANCH`, now hands git-safety that text, not its value.
+
 - **Not closed here:** the gate runs the project's own tooling, which reads files a sandboxed
   command can still write: linter and type-checker configs, the `package.json` script behind
   `pnpm typecheck`, the `build.rs` behind `cargo check`, and the `node_modules/.bin` entry behind
