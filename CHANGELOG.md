@@ -77,7 +77,8 @@ repository means re-running `npx agentspine`.
   preflight then took that head as reviewed. The workflow now turns background tasks off, and the
   poster checks the record: one where fewer reviewers returned than were spawned, or where a full
   review spawned none, is posted as incomplete with a failed `claude-review` status (none on a
-  partial pass) and a failed step, without its findings, and is recorded as errored so the next run reviews the head again.
+  partial pass) and a failed step, without its findings, and is recorded as errored so the next
+  run reviews the head again.
 - A review step that reported success and left no structured output, as the action does when it
   skips itself, posted "not reviewed" but left the poster's step green and the record clean. Both
   now fail.
