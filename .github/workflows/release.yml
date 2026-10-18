@@ -27,10 +27,10 @@ jobs:
       contents: read
       id-token: write # npm trusted publishing
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # audit-authors.sh walks the whole history, not just the tagged commit.
         with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: "20", registry-url: "https://registry.npmjs.org" }
       # Trusted publishing needs npm 11.5.1 or newer; Node 20 ships npm 10. Pinned to a major,
       # so the credential exchange is not at the mercy of whatever `latest` resolves to today.
@@ -65,7 +65,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Publish the release notes from the changelog
         env:
           GH_TOKEN: ${{ github.token }}

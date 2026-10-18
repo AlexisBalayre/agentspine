@@ -1,0 +1,19 @@
+# Daily, not weekly: the claude-code-action pin also fixes the Claude Code version the CI review
+# runs, and the action releases within minutes of each Claude Code release.
+# The review workflow exists twice, as the template the ci-review pack emits and as the copy this
+# repository runs, rendered from it. test/workflow-sync.test.ts fails when the two differ, so each
+# bump is one pull request across every directory.
+# The review is owner-only and skips Dependabot's pull requests: the first review after merging a
+# bump is that bump's real test.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /templates/github/workflows
+      - /.github/actions/*
+    schedule:
+      interval: daily
+    groups:
+      actions:
+        group-by: dependency-name

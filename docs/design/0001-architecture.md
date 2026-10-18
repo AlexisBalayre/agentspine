@@ -909,3 +909,46 @@ Costs accepted:
 - **A comment on a closed PR gets no verdict reaction**, as above.
 
 The Claude Code facts the lock rests on are recorded in the capability matrix, read 2026-10-18.
+
+## 32. Following the review action's releases
+
+Date: 2026-10-18
+
+The template now bumps its pinned actions daily with Dependabot (its #35-#40). The
+`claude-code-action` pin also fixes which Claude Code the CI review runs, because the action
+bundles it, and the action releases within minutes of each Claude Code release. A weekly bump would
+leave the review a week behind.
+
+**Both copies of the workflow move in one pull request.** The review workflow exists here as the
+template the `ci-review` pack emits and as the copy `scripts/render-review-workflow.mjs` renders
+from it, and `workflow-sync.test.ts` fails when they differ. Dependabot's documentation names only
+`.github/workflows` for GitHub Actions. Its source scans every `*.yml` in any other directory it is
+given (`github_actions/lib/dependabot/github_actions/file_fetcher.rb:166-180`, dependabot-core
+`de71a59`), so `directories` lists `/`, `/templates/github/workflows` and `/.github/actions/*`.
+`group-by: dependency-name` makes each bump one pull request across all three.
+
+- Dependabot authors as `49699333+dependabot[bot]@users.noreply.github.com`, which joins
+  `.github/allowed-authors.txt`. GitHub commits its changes as `noreply@github.com`, already listed.
+- **Cost accepted:** the review is owner-only and skips Dependabot's pull requests, as the
+  template's does. The first review after merging a bump is that bump's real test.
+
+**The pack emits no `dependabot.yml`.** A scaffolded repository keeps its pin until it re-scaffolds,
+and the README gives the snippet that moves it daily instead.
+
+- **Rejected:** writing one with `ci-review`. The file may already exist in the user's `.github/`,
+  and a daily stream of pull requests is that repository's policy to choose.
+- **Cost accepted:** a repository that does neither reviews on the Claude Code it was scaffolded
+  with.
+
+**The bumps.** `claude-code-action` v1.0.251 (its `bun.lock` pins the agent SDK at 0.3.301, which
+is Claude Code 2.1.301), `checkout` v7, `setup-node` v7, `upload-artifact` v7 and
+`download-artifact` v8, in the emitted workflow and in this repository's CI. The template is still
+on `upload-artifact` v4. It moves here so both artifact actions are on current majors. The action's
+restored-config list is unchanged at v1.0.251, still without `AGENTS.md`, so the restore step stays.
+
+`setup-node` caches npm on its own from v5 when `package.json` names npm as its package manager.
+The emitted workflow runs in the user's checkout, so that `package.json` is theirs. Its review
+jobs install nothing from that lockfile, and setup-node's README recommends turning the cache off
+in workflows holding sensitive credentials, so every `setup-node` step sets
+`package-manager-cache: false`. This differs from the template, which caches its own tooling's
+lockfile on purpose.

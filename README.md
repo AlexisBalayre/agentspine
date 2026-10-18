@@ -139,6 +139,22 @@ The workflow's deterministic steps are `agentspine review preflight|schema|post|
 from npm at the version that scaffolded the file, so the repository gets a workflow and no
 toolchain of its own. Re-scaffold to move that pin.
 
+The `anthropics/claude-code-action` pin also fixes which Claude Code runs the review, since the
+action bundles it: v1.0.251, Claude Code 2.1.301. A re-scaffold moves it too. To follow Claude Code
+between re-scaffolds, let Dependabot bump the workflow's actions. It changes the action pins only,
+never the tooling version, and its pull requests get no review, because its author is none of
+the associations below:
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+```
+
 Two setup steps, both in the comment at the top of the emitted workflow: add the
 `CLAUDE_CODE_OAUTH_TOKEN` secret, and create the `ci/review-metrics` orphan branch that stores each
 run's record for `review-retro` to mine.

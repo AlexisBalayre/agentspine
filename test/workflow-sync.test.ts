@@ -77,6 +77,23 @@ describe.each([
   });
 });
 
+describe.each([
+  ["the emitted template", "templates/github/workflows/claude-code-review.yml"],
+  ["this repo's copy", ".github/workflows/claude-code-review.yml"],
+])("%s caches nothing from the checkout", (_label, file) => {
+  const workflow = readFileSync(path.resolve(file), "utf8");
+
+  // setup-node caches on its own when the checkout's package.json names npm, and the checkout is
+  // the user's repository. The jobs install nothing from its lockfile, so the cache is only risk.
+  it("turns off setup-node's automatic cache in every job", () => {
+    const steps = workflow.split("uses: actions/setup-node@").slice(1);
+    expect(steps.length).toBeGreaterThan(0);
+    for (const step of steps) {
+      expect(step.split(/\n\s+- /)[0]).toContain("package-manager-cache: false");
+    }
+  });
+});
+
 /** The managed settings the lock step writes, parsed. */
 function managedSettings(workflow: string) {
   const heredoc = /managed-settings\.json >\/dev\/null <<'EOF'\n([\s\S]*?)\n {10}EOF\n/.exec(workflow)?.[1] ?? "";

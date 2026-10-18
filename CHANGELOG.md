@@ -53,7 +53,12 @@ repository means re-running `npx agentspine`.
 - The emitted review workflow runs its orchestrator on Opus 5.5 instead of Sonnet 5, and pins the
   `opus` and `sonnet` aliases the reviewers are spawned with to `claude-opus-5-5` and
   `claude-sonnet-5-5`, so a Claude Code bump cannot move a tier silently. A review costs more per
-  run. It runs through `claude-code-action` v1.0.237.
+  run.
+- The emitted review workflow runs `claude-code-action` v1.0.251, which bundles Claude Code
+  2.1.301, and `actions/checkout` v7, `actions/setup-node` v7, `actions/upload-artifact` v7 and
+  `actions/download-artifact` v8. A download whose hash does not match now fails instead of
+  warning. setup-node's automatic npm cache is turned off: it keys on the repository's own
+  lockfile, from which the review installs nothing.
 - `.claude/agents/` is now a directory of real files, not a link to `.agents/agents/`: each shared
   reviewer manifest, plus the keys only Claude Code reads. `review-correctness`, `review-security`
   and `review-validator` ask for `effort: high` there. The key stays out of the shared manifests

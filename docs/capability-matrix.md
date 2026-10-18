@@ -150,8 +150,9 @@ copy and not the shared files (decision 28).
 
 Read 2026-10-18, from Claude Code's documentation. The emitted review workflow writes these into
 `/etc/claude-code/managed-settings.json`, the managed settings path on Linux (decision 31). The run
-uses the Claude Code that `claude-code-action` v1.0.237 bundles, 2.1.285 (its
-`@anthropic-ai/claude-agent-sdk` 0.3.285, whose `claudeCodeVersion` is 2.1.285).
+uses the Claude Code that `claude-code-action` v1.0.251 bundles, 2.1.301 (its `bun.lock` pins
+`@anthropic-ai/claude-agent-sdk` 0.3.301, whose `claudeCodeVersion` is 2.1.301). Dependabot moves
+this repository's pin (decision 32); 2.1.301 is the version these facts were checked against.
 
 | Setting or fact | What the docs say it does |
 | :-- | :-- |
