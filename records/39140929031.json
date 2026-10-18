@@ -1,0 +1,162 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T15:36:39.014Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39140929031",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39140929031",
+  "actor": "AlexisBalayre",
+  "commit_sha": "fb6997a97baaec9585d8b01cacd0eed5c9651264",
+  "source": "pr",
+  "pr_number": 42,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "docs",
+    "maintainability"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "conventions",
+    "docs",
+    "maintainability"
+  ],
+  "reviewers_skipped": [
+    "context",
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "24fa417e4b4159810b4d9fe70faf05ca05c7d05c",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1048-1049",
+      "status": "resolved"
+    }
+  ],
+  "findings": [
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "14",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "A `.env` that passes `[ -f ]` but can't be read (for example root-owned with mode 0600) now blocks every Bash call. GNU sed exits 2 when it can't open an input file. Under `set -euo pipefail` that 2 becomes the assignment's status, so the policy exits 2. The adapter (`claude-shaped.sh`) treats 2 as \"block\", so every Bash call is blocked and stderr shows only `sed: can't read .../.env: Permission denied`, not a BLOCKED reason. This goes against the adapter's rule that \"A policy that crashed must not block the session\". The old `. \"$PROJECT_DIR/.env\"` failed with status 1 here, which the adapter turned into \"allowing\". BSD sed exits 1, so macOS is unaffected; there, a sandboxed `chmod 000 .env` turns off every git-safety rule, which is more than decision 34's 'Cost accepted' admits. A small fix is to append `2>/dev/null` to the sed call, or to test `[ -r ... ]` instead of `[ -f ... ]`.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "470-476",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The \"runs nothing written into .env\" test checks only that the marker file is absent. It never asserts the hook's exit status or stderr, and the adapter turns a missing jq or a crashed policy into exit 0, so the test would also pass if the policy exited before reading `.env`. Asserting `status` 0 would prove the policy ran.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1056-1058",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "\"A value written with shell syntax, such as `$(...)`, is now read as text\" is not a cost. It is the benefit, and it repeats the CHANGELOG sentence and the paragraph at line 1027. The real cost is the first sentence about `GIT_TRUNK` in `.env`. Drop the second sentence from the `Cost accepted` bullet.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1029",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The parser summary \"strips one pair of quotes or a trailing comment\" is loose against git-safety.sh: a quoted value is cut at the first matching inner quote (anything after it is dropped), and an unquoted value is cut at the first whitespace, not at a comment specifically. Consider \"takes the value up to the closing quote, or up to the first whitespace when unquoted\".",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "304-306",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The line \"The probe: sandbox-runtime 0.0.80 (tag `v0.0.80`, `626a596`) on macOS 26.6.2, 2026-10-18\" does not say what was probed, and it sits as a source bullet in the Claude Code group though no claim cites it. Name the observed behaviour, e.g. that `denyWrite` blocks a sandboxed write under `.agents/`.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "src/plan.utils.ts",
+      "line": "145-147",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The reworded comment is accurate, but the inserted clause \"Claude Code through the .claude/skills link when it is one\" interrupts the sentence and \"when it is one\" is vague; \"Claude Code reaches them through `.claude/skills` when that is a link\" reads better.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "432",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new `describe` defines its own `repoOnDevelop` and `commit` helpers, re-implementing the temp-repo git setup and the `spawnSync(\"bash\", [ADAPTER, \"git-safety\"], ...)` runner that already appear in the file's earlier blocks; this adds another copy. File-level `gitIn(cwd)` and `runGitSafety(root, command)` helpers would let every block shrink.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1027-1036",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The new git-safety paragraph and its `Rejected: denying ./.env` bullet sit between the denyWrite paragraph (line 1021) and its Rejected bullets. Those bullets are `Edit(./.agents/**)` at line 1035 and the following ones. A reader now takes \"Rejected: an `Edit(./.agents/**)` deny rule\" and \"Cost accepted: a sandboxed `git checkout`...\" to belong to the `.env` paragraph. The git-safety paragraph and its bullets are interleaved with the denyWrite ones. The `Cost accepted` bullet at line 1056 is also separated from the paragraph it qualifies.",
+      "refutation": "The layout is real: decision 34 (lines 1010-1064) puts both bold paragraphs before one shared bullet list, unlike decisions 21 and 32. But it does not mislead. Each later bullet names its own subject: line 1035 says \"Claude Code adds it to `denyWrite`\", lines 1038 and 1041 name the `.agents/` hooks and `./**/.agents`, and line 1056 names `GIT_TRUNK` in `.env`. Blank lines at 1034 and 1043 group the clusters. That is a scanability nit, not a fix-before-merge defect. A low-priority tidy: put the `.env` bullet directly under its paragraph, or move the git-safety paragraph after the denyWrite bullets."
+    }
+  ],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.9989147000000005,
+  "duration_ms": 204604,
+  "num_turns": 13,
+  "tokens": {
+    "input": 14,
+    "output": 11238,
+    "cache_read": 289765,
+    "cache_creation": 49541,
+    "total": 350558
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 44,
+      "output": 31912,
+      "cache_read": 762285,
+      "cache_creation": 146487,
+      "cost_usd": 1.6719310000000003
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 28,
+      "output": 8608,
+      "cache_read": 242902,
+      "cache_creation": 86623,
+      "cost_usd": 0.32698369999999993
+    }
+  ],
+  "permission_denials": [
+    {
+      "tool": "Bash",
+      "input": "git -C /home/runner/work/agentspine/agentspine diff 24fa417e4b4159810b4d9fe70faf05ca05c7d05c..HEAD -- docs/design/0001-architecture.md"
+    }
+  ]
+}
