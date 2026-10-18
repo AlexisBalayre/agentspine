@@ -56,8 +56,16 @@ export function commentBody(finding: Finding, relocatedFrom: number | null): str
     const fence = "`".repeat(Math.max(3, ...runs.map((run) => run.length + 1)));
     // A committable suggestion rewrites the line it is attached to, so on a
     // relocated anchor it would replace code the finding never mentioned. Same
-    // text, inert fence.
-    parts.push("", relocatedFrom === null ? `${fence}suggestion` : fence, finding.suggestion, fence);
+    // text, inert fence. The text goes through inertFences too: a body that
+    // leaves a fence open makes this fence that block's close, and the
+    // suggestion after it plain markdown.
+    const relocated = relocatedFrom !== null;
+    parts.push(
+      "",
+      relocated ? fence : `${fence}suggestion`,
+      relocated ? inertFences(finding.suggestion) : finding.suggestion,
+      fence,
+    );
   }
   return parts.join("\n");
 }

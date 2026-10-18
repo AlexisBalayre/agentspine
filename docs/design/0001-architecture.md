@@ -830,7 +830,8 @@ workflow and global tooling install:
 
 - `@claude review` reads `full`, a depth (`quick`, `deep`) and reviewer areas from the comment. A
   quick or area-restricted round is **partial**: the preflight never takes one as the prior, so
-  the next round covers what it skipped, and its status says "partial review".
+  the next round covers what it skipped. It sets no `claude-review` status, so it never turns the
+  last complete review's red green, or its green red.
 - The poster hands back a reaction for the comment (🚀, 👍 when partial, 👎, 😕), and the workflow
   clears its earlier ones.
 - A `review-spec` reviewer holds the change against the issue it closes. Its findings never carry
@@ -852,7 +853,9 @@ sat on a runner whose environment carried the Claude OAuth token. Now:
 - The verbs are the read-only ones the protocol names.
 - The sandbox refuses writes outside the checkout and Claude Code's per-user temp directory, and any
   host but `api.github.com`, and fails the run rather than start without itself.
-- The scrub keeps credentials out of anything the model could print into the record.
+- The scrub strips the credentials it recognises from the model's shell, so they stay out of
+  anything it could print into the record. It leaves the job's read-only `GH_TOKEN`, which `gh`
+  needs.
 
 `Bash(gh api repos/*)`, which decision 21 kept because the orchestrator read comment threads
 through it, goes: gh bundles short flags (`-if body=x` is a POST), so no deny rule can hold it

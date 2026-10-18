@@ -233,13 +233,15 @@ jobs:
       # Managed settings are the one rule source no repo file can widen: with
       # allowManagedPermissionRulesOnly, the grants written for local use (the
       # skill's allowed-tools, .claude/settings.json) stop counting. `allow`
-      # lists every Bash verb the protocol runs; Read, Glob, Grep and Agent need
-      # no rule inside the checkout. Anything else is refused and lands in the
-      # record's permission_denials, so a verb the skill starts using must be
-      # added here: dontAsk, the mode set here, denies whatever would prompt,
-      # and a run in any other mode has nobody to answer the prompt. Auto mode,
-      # whose classifier approves commands no rule names, is off. None of the verbs
-      # writes: the poster job is the review's only writer, so a PR whose diff
+      # lists the gh and git verbs the protocol runs; Read, Glob, Grep and Agent
+      # need no rule inside the checkout, and Claude Code's built-in read-only
+      # commands (`ls`, `cat`, `head`, `grep`, `find`, `cd`, read-only `git`)
+      # run in every mode, a set no setting changes. Anything else is refused
+      # and lands in the record's permission_denials, so a verb the skill starts
+      # using must be added here: dontAsk, the mode set here, denies whatever
+      # would prompt, and a run in any other mode has nobody to answer the
+      # prompt. Auto mode, whose classifier approves commands no rule names, is
+      # off. None of the verbs writes: the poster job is the review's only writer, so a PR whose diff
       # tells the reviewer to post something has no channel to do it through.
       # `gh api` stays out because no deny pattern can hold it read-only: gh
       # bundles short flags (`-if body=x` is a POST). `git fetch` and `git
@@ -248,7 +250,8 @@ jobs:
       # match `git difftool`, which runs a command, and `git grep` stays out
       # because `-O` runs one (the Grep tool covers it). `deny` holds the file
       # tools in every mode, since a --permission-mode flag outranks the mode
-      # set here (the action's tag mode passes acceptEdits), and strips
+      # set here (the `prompt` input runs the action's agent mode, which passes
+      # none, but its tag mode passes acceptEdits), and strips
       # `--output`, which makes any git diff, log or show write a file of its
       # choosing, and refuses a `gh` read naming a repo: a fork's PR body can
       # close another repo's issue, which the job's token may read and the

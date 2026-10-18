@@ -298,12 +298,11 @@ describe("the reaction the poster hands to the comment", () => {
     expect(reaction(structuredOutput, partial).output).toContain(expected);
   });
 
-  it("is matched by a commit status that says the review was partial", () => {
-    const status = reaction(verdict(), "true").calls.find((call) => call.args.includes("/statuses/"));
-    expect(JSON.parse(status?.input ?? "{}")).toMatchObject({
-      state: "success",
-      description: "partial review: no blocking issues",
-    });
+  it.each([
+    ["no verdict", ""],
+    ["no important finding", verdict()],
+  ])("leaves the commit status to the last full review after a partial pass with %s", (_label, structuredOutput) => {
+    expect(reaction(structuredOutput, "true").calls.some((call) => call.args.includes("/statuses/"))).toBe(false);
   });
 });
 

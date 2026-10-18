@@ -14,7 +14,7 @@ Think wrong behavior on realistic inputs, contract mismatches that type-check fi
 
 **Behavioral regression is a first-class target.** Compare the changed paths against their prior behavior. The covered surface is the suite's job; yours is the surface no test exercises, where a silent behavior change ships unnoticed. When reading leaves a behavior question open, settle it with a spike: run the suspect path or a targeted one-liner against the input you distrust. Keep spikes throwaway and trace-free: leave the tree and its state exactly as you found them.
 
-Not under CI. When your brief says the run is CI, the review is static: the brief forbids spikes, and the checkout carries none of the project's dependencies, so a spike attempt burns tool calls to end where static reading starts. Settle an open behavior question by tracing the path through the checked-out tree; a claim about a dependency's internals rests on pinned-version knowledge and caps at `medium` confidence.
+When your brief says the run is CI, the review is static: the brief forbids spikes, and the checkout carries none of the project's dependencies, so a spike attempt burns tool calls to end where static reading starts. Settle an open behavior question by tracing the path through the checked-out tree; a claim about a dependency's internals rests on pinned-version knowledge and caps at `medium` confidence.
 
 Do not flag purely theoretical issues with no plausible trigger in real use.
 
