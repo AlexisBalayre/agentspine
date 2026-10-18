@@ -30,8 +30,8 @@ repository means re-running `npx agentspine`.
   spec (`--spec`). Its findings are never auto-fixed and never carry a committable suggestion,
   since a fix written from issue text rests on whoever wrote the issue.
 - `@claude review` reads the words after it: `full`, a depth (`quick`, `deep`) and reviewer areas,
-  in any order. A quick or area-restricted review is partial: unless it fails, it leaves the
-  `claude-review` status to the last complete review, and the next review diffs from that one.
+  in any order. A quick or area-restricted review is partial: it never sets the `claude-review`
+  status, even when it fails, and the next review diffs from the last complete one.
   `deep` also runs the orchestrator at high effort.
 - The emitted workflow reacts to a `@claude review` comment with the verdict: 🚀, 👍 for a partial
   review, 👎 when important findings were posted, 😕 when the run never reached one. The poster

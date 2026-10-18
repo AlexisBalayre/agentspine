@@ -197,18 +197,19 @@ export function main(): number {
   } finally {
     const importants = anchored.length + unanchored.length;
     const failure = noVerdict ?? (reviewPosted ? null : "the review could not be posted");
-    // A quick or area-restricted pass is no merge signal, so one that reaches a
-    // verdict leaves the status to the last full review, whose red it would
-    // otherwise turn green. One that dies still fails the check.
+    // A quick or area-restricted pass is no merge signal, so it never sets the
+    // status, which speaks for the last full review alone: a partial success
+    // would turn that review's red green, and a partial failure its green red,
+    // which no later partial pass could clear. The reaction says how it went.
     const partial = env.REVIEW_PARTIAL === "true";
     const outcome = importants > 0 ? `${importants} important finding(s)` : "no blocking issues";
     const sha = env.REVIEW_COMMIT_SHA ?? "";
-    if (!sha) {
+    if (partial) {
+      process.stdout.write("partial pass; leaving the claude-review status to the full review\n");
+    } else if (!sha) {
       warn("no commit sha; skipping the claude-review status");
     } else if (failure) {
       setCommitStatus(repository, sha, "failure", failure);
-    } else if (partial) {
-      process.stdout.write("partial pass; leaving the claude-review status as it is\n");
     } else {
       setCommitStatus(repository, sha, "success", outcome);
     }
