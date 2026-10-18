@@ -1,0 +1,100 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T13:50:20.990Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39133082329",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39133082329",
+  "actor": "AlexisBalayre",
+  "commit_sha": "29884f3f9beaad3cdd25e941a1dd1cdc55b07c97",
+  "source": "pr",
+  "pr_number": 39,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "conventions",
+    "docs",
+    "maintainability"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "conventions",
+    "docs",
+    "maintainability"
+  ],
+  "reviewers_skipped": [
+    "security",
+    "context",
+    "spec"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "CHANGELOG.md",
+      "line": "78-80",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "This Unreleased 'Fixed' entry still says an incomplete round is posted 'with a failed `claude-review` status'. That is now false for a partial pass. README L127 got the 'A complete run' qualifier in this PR, but this entry did not.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/review/review-cli.test.ts",
+      "line": "292-306",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "Nothing tests the 😕 reaction on a failed partial pass, which the docs now call the failure's only sign. Add a `[\"no verdict on a partial pass\", \"\", \"true\", \"reaction=confused\"]` row to the reaction table. The new it.each checks only that no status was set.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "README.md",
+      "line": "165-169",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "'The check stays the last complete review's' is ambiguous: a partial pass that dies still exits 1 (post.script.ts:226), so the workflow job goes red even though the commit status does not. The clause also repeats 'leaves the `claude-review` status to the last complete one' from two lines earlier.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.1445957,
+  "duration_ms": 134077,
+  "num_turns": 9,
+  "tokens": {
+    "input": 10,
+    "output": 6182,
+    "cache_read": 174947,
+    "cache_creation": 34845,
+    "total": 215984
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 36,
+      "output": 13119,
+      "cache_read": 656277,
+      "cache_creation": 86636,
+      "cost_usd": 0.9314944000000001
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 22,
+      "output": 4435,
+      "cache_read": 212049,
+      "cache_creation": 50519,
+      "cost_usd": 0.21310130000000005
+    }
+  ],
+  "permission_denials": []
+}
