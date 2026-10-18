@@ -1,0 +1,150 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T10:37:07.022Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39119517855",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39119517855",
+  "actor": "AlexisBalayre",
+  "commit_sha": "404c2ce868492c6374792a511ac8f6990dc7f29b",
+  "source": "pr",
+  "pr_number": 34,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "correctness",
+    "security",
+    "conventions",
+    "docs",
+    "maintainability",
+    "context"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "correctness",
+    "security",
+    "conventions",
+    "docs",
+    "maintainability",
+    "context"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/agents/skills/wizard/template.sh",
+      "line": "146-157",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "important",
+      "description": "At BASE, `write_env` always left the env file at mode 0600, because it replaced the file with a `mktemp` file (`mv \"$tmp\" \"$ENV_FILE\"`). The PR writes into the existing file instead, which keeps whatever mode it already had. The new `umask 077` only applies when the file doesn't exist yet. A common setup is `cp .env.example .env`, which gives 0644 under the usual umask 022. In that case the wizard now writes `STRIPE_SECRET_KEY='...'` into a file every local user can read. Before this PR, the first `write_env` would have tightened it to 0600. Through a symlink, the target's mode is kept, which has the same problem.",
+      "body": "**An existing env file is no longer tightened to owner-only**\n\nAt the merge base, `write_env` ended with `mv \"$tmp\" \"$ENV_FILE\"`. `mktemp` creates its file at 0600, so every run left `.env` at 0600, even when it started at 0644. This PR writes into the existing file in place:\n\n```bash\n[[ -e \"$ENV_FILE\" ]] || (umask 077 && : > \"$ENV_FILE\")\n...\ncat \"$tmp\" > \"$ENV_FILE\"\n```\n\nThe `umask 077` only applies when the file is missing. Take a `.env` made with `cp .env.example .env` (0644 under umask 022), or a 0644 symlink target. It keeps its mode, so the secret the wizard collected with hidden input ends up in a file other local users can read. The docstring is accurate (\"keeps an existing file's mode\"). But decision 29 and the CHANGELOG present this change as hardening and record no cost for losing the base's tightening.\n\nWriting through the symlink still works if you add `chmod go-rwx`: `chmod` follows the link to its target. Run it before the secret is written rather than after the `cat`. That way a secret never sits in a readable file, and a failing `chmod` under `set -e` aborts before anything is written. The docstring would then read \"leaves ENV_FILE (or its target) readable by its owner only\".\n\nhttps://github.com/AlexisBalayre/agentspine/blob/404c2ce868492c6374792a511ac8f6990dc7f29b/templates/agents/skills/wizard/template.sh#L143-L157",
+      "suggestion": "  [[ -e \"$ENV_FILE\" ]] || (umask 077 && : > \"$ENV_FILE\")\n  chmod go-rwx \"$ENV_FILE\""
+    },
+    {
+      "file": "templates/agents/skills/wizard/template.sh",
+      "line": "119-121",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "`ask` now shows its prompt through `read -e -p`, and bash writes that prompt to stderr only when stdin is a terminal. With piped answers or `2>log`, `ask`'s prompts and the \"[Enter keeps current]\" hint disappear. `ask_secret`, `pause` and `confirm` still print theirs to stdout, so the output becomes inconsistent.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/skills/implement-spec/SKILL.md",
+      "line": "25",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "implement-spec step 3 asks for a draft PR \"marked as closing the spec and tickets\" but takes the body from `pr-description`. That skill closes only the ticket and links the spec as non-closing (`Closes <ISSUE>. Part of <PARENT-ISSUE>.`). Following it as written leaves the spec issue open after merge.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "100-105",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The matrix records how Claude Code encodes transcript folder names as \"observed 2026-10-18\", and `retro` hardcodes that rule. AGENTS.md says that where the docs are silent, the claim cites the tool's source file and line. Cite the source, or have `retro` prefer the documented `transcript_path`.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "AGENTS.md",
+      "line": "8",
+      "area": "conventions",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "AGENTS.md \"Read first\" still says \"the 28 decisions\", but this PR adds decision 29 to docs/design/0001-architecture.md. Update the count or drop the number.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "320-348",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "Decision 18 still says \"`planning` requires `thinking` and `engineering`\" and lists `resolving-merge-conflicts` as shipped, with no pointer to decision 29, which adds `review` to the requirement and retires that skill. A short \"(see decision 29)\" in both places would keep readers of 18 alone from learning the old rule.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/skills/wizard/template.sh",
+      "line": "ask()/ask_secret()",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`ask` and `ask_secret` now duplicate the same keep-current lookup, the \"[Enter keeps current]\" hint and the `(( rc )) && [[ -z \"$input\" ]]` EOF check, and differ only in how the prompt is built and read. A later change to that UX has to be made in both places.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/init.test.ts",
+      "line": "191-200",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The planning-pack test comment says implement-spec invokes `pr-description` and `review-changes`, but the test only asserts `review-changes`. It also never asserts that `implement-spec` itself is installed.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/skills/wizard/template.sh",
+      "line": "149-153",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "`write_env`'s `mktemp` file holds every secret in the env file. If the wizard is interrupted with Ctrl-C, or `cat` fails under `set -e`, nothing removes it, so a copy stays in `$TMPDIR`. A `trap` to remove it, or a temp file next to `$ENV_FILE`, would close the gap.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "The `.claude-pr/` snapshot did not contain the PR's copies of `templates/` (it held only `.claude/`, `CLAUDE.md` and `settings.json`), even though `templates` is in RESTORE_PATHS. Every reviewer had to fall back to `git show HEAD:<path>` to read the PR versions."
+    },
+    {
+      "component": "context",
+      "description": "The context reviewer did not fetch the cited Claude Code hooks docs (WebFetch not loaded), so the matrix's `transcript_path` claim was checked only against the skill, not against the source."
+    }
+  ],
+  "comments_posted_actual": 1,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 3.2686923000000006,
+  "duration_ms": 361123,
+  "num_turns": 14,
+  "tokens": {
+    "input": 12,
+    "output": 12955,
+    "cache_read": 228575,
+    "cache_creation": 63075,
+    "total": 304617
+  }
+}
