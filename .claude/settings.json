@@ -23,5 +23,13 @@
         ]
       }
     ]
+  },
+  "sandbox": {
+    "filesystem": {
+      "denyWrite": [
+        "./.agents",
+        "./templates/agents"
+      ]
+    }
   }
 }

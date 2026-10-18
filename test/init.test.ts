@@ -70,6 +70,20 @@ describe("init", () => {
     expect(settings.hooks.PreToolUse).toHaveLength(1);
   });
 
+  // Decision 34: hooks run outside the sandbox, so what they run must be out of a sandboxed
+  // command's reach.
+  it("denies sandboxed commands writes to .agents/, with or without hooks", () => {
+    runCli(["--dir", repo, "--yes"]);
+    const settings = JSON.parse(readFileSync(path.join(repo, ".claude/settings.json"), "utf8"));
+    expect(settings.sandbox.filesystem.denyWrite).toEqual(["./.agents"]);
+
+    const other = demoRepo();
+    runCli(["--dir", other, "--yes", "--skip-hooks"]);
+    const bare = JSON.parse(readFileSync(path.join(other, ".claude/settings.json"), "utf8"));
+    expect(bare.hooks).toBeUndefined();
+    expect(bare.sandbox.filesystem.denyWrite).toEqual(["./.agents"]);
+  });
+
   it("is idempotent: a second run duplicates nothing", () => {
     runCli(["--dir", repo, "--yes"]);
     runCli(["--dir", repo, "--yes", "--force"]);
@@ -78,6 +92,7 @@ describe("init", () => {
     expect(agents.match(/agentspine:start/g)).toHaveLength(1);
     expect(settings.hooks.PreToolUse).toHaveLength(1);
     expect(settings.hooks.Stop).toHaveLength(1);
+    expect(settings.sandbox.filesystem.denyWrite).toEqual(["./.agents"]);
   });
 
   // Decision 10: a gate the user believes is running but is not is worse than an unfinished one.

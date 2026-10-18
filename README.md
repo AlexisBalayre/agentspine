@@ -76,6 +76,13 @@ Skills need no translation: all five follow the Anthropic Agent Skills spec. Hoo
 names its events differently, and Mistral Vibe denies by printing JSON rather than by exit code —
 so shared policies are written once and a per-tool adapter speaks each host's protocol.
 
+Hooks read their policies, and the quality gate its commands, from `.agents/`, and Claude Code
+runs hooks outside its sandbox. So its `settings.json` also denies sandboxed commands writes to
+`.agents/` (`sandbox.filesystem.denyWrite`), in effect once you turn the sandbox on. Codex
+write-protects `.agents/` itself. Cursor has no setting that denies a write inside the
+workspace, and opencode and Mistral Vibe run commands without a sandbox:
+[who can rewrite `.agents/`](docs/capability-matrix.md#who-can-rewrite-agents-from-a-sandboxed-command).
+
 ## Skill packs
 
 One skill ships with every scaffold: **`adapt-to-project`**. Run it once after `init`. It runs

@@ -142,6 +142,10 @@ const claudeHooks = (hooks: boolean) =>
       }
     : {};
 
+// Hooks run outside the sandbox and read their policies from .agents/, and skills load from it
+// through the .claude/skills link, so a sandboxed command must not write it, hooks or not
+// (decision 34). Inert until the user turns the sandbox on.
+const CLAUDE_SANDBOX = { sandbox: { filesystem: { denyWrite: ["./.agents"] } } };
 
 const REPO_ROOT_CMD = '"$(git rev-parse --show-toplevel)"';
 
@@ -306,7 +310,7 @@ export function buildPlan(options: PlanOptions): Action[] {
 
   if (tools.includes("claude-code")) {
     actions.push(spliceOrCreate(root, "CLAUDE.md", CLAUDE_BODY));
-    if (hooks) actions.push({ kind: "merge-json", target: ".claude/settings.json", value: claudeHooks(true) });
+    actions.push({ kind: "merge-json", target: ".claude/settings.json", value: { ...claudeHooks(hooks), ...CLAUDE_SANDBOX } });
     actions.push(
       symlink
         ? { kind: "symlink", target: ".claude/skills", to: "../.agents/skills" }
