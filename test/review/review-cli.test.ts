@@ -424,7 +424,7 @@ function workflowStep(name: string): string {
 describe("the workflow's config restore", () => {
   // A base commit holding the trusted config, and a PR branch that `edit` rewrites, checked out.
   // `outside` is a directory beside the repository that no write may reach.
-  function restoreRepo(edit: (dir: string, outside: string) => void) {
+  function restoreRepo(edit: (dir: string, outside: string) => void, restorePaths = "AGENTS.md .agents") {
     const root = mkdtempSync(path.join(tmpdir(), "agentspine-restore-"));
     const dir = path.join(root, "repo");
     const outside = path.join(root, "outside");
@@ -443,7 +443,7 @@ describe("the workflow's config restore", () => {
     const result = spawnSync("bash", ["-euo", "pipefail", "-c", workflowStep("Restore startup config from base")], {
       cwd: dir,
       encoding: "utf8",
-      env: { ...process.env, MERGE_BASE: base, RESTORE_PATHS: "AGENTS.md .agents", RUNNER_TEMP: root },
+      env: { ...process.env, MERGE_BASE: base, RESTORE_PATHS: restorePaths, RUNNER_TEMP: root },
     });
     return { dir, outside, result };
   }
@@ -499,5 +499,30 @@ describe("the workflow's config restore", () => {
     expect(result.status).toBe(0);
     expect(readFileSync(path.join(dir, "AGENTS.md"), "utf8")).toBe("trusted rules\n");
     expect(readlinkSync(path.join(dir, ".claude-pr-agents/.agents/x/AGENTS.md"))).toBe("-f");
+  });
+
+  it("snapshots a link once more when two entries overlap", () => {
+    const { dir, result } = restoreRepo((dir) => {
+      symlinkSync("target", path.join(dir, ".agents/skills/link"));
+    }, "AGENTS.md .agents .agents/skills");
+    expect(result.status).toBe(0);
+    expect(readlinkSync(path.join(dir, ".claude-pr-agents/.agents/skills/link"))).toBe("target");
+  });
+
+  it("refuses an entry whose leading directory the PR commits as a link", () => {
+    const { outside, result } = restoreRepo((dir, outside) => {
+      mkdirSync(path.join(outside, "agents"));
+      writeFileSync(path.join(outside, "agents/keep.txt"), "outside the checkout\n");
+      symlinkSync(outside, path.join(dir, "shared"));
+    }, "AGENTS.md .agents shared/agents");
+    expect(result.status).not.toBe(0);
+    expect(readdirSync(path.join(outside, "agents"))).toEqual(["keep.txt"]);
+  });
+
+  it("points reviewers at the directory the step snapshots into", () => {
+    const snapshotDir = /^mkdir (\S+)$/m.exec(workflowStep("Restore startup config from base"))?.[1];
+    const skill = readFileSync(path.resolve("templates/agents/skills/pr-ci-review/SKILL.md"), "utf8");
+    expect(snapshotDir).toBe(".claude-pr-agents");
+    expect(skill).toContain(`Read ${snapshotDir}/<path>`);
   });
 });

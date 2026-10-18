@@ -188,6 +188,7 @@ jobs:
           # Separate commands: in an && list, bash -e skips mkdir after a failed rm and carries on.
           rm -rf .claude-pr-agents
           mkdir .claude-pr-agents
+          # Out of git status, where reviewers would read the snapshot as files the PR added.
           exclude=$(git rev-parse --git-path info/exclude)
           mkdir -p "$(dirname "$exclude")"
           echo /.claude-pr-agents/ >> "$exclude"
@@ -199,11 +200,22 @@ jobs:
               dest=".claude-pr-agents/${entry#*$'\t'}"
               mkdir -p "$(dirname "$dest")"
               # A gitlink (160000) names a commit, not a blob, so it has nothing to snapshot.
+              # -fn: overlapping entries snapshot the same link twice.
               case "$mode" in
-                120000) ln -s -- "$(git cat-file blob "$oid")" "$dest" ;;
+                120000) ln -sfn -- "$(git cat-file blob "$oid")" "$dest" ;;
                 100644 | 100755) git cat-file blob "$oid" > "$dest" ;;
               esac
             done < "${RUNNER_TEMP}/pr-snapshot"
+            # The removal below follows a link in a leading component, which the PR can commit,
+            # so such an entry fails the review instead of deleting outside the checkout.
+            parent=$path
+            while [ "$parent" != "${parent%/*}" ]; do
+              parent=${parent%/*}
+              if [ -L "$parent" ]; then
+                echo "::error::$parent is a link in the PR; refusing to restore $path through it"
+                exit 1
+              fi
+            done
             # Removed first: checking out the base's copy alone would keep files the PR added.
             rm -rf "$path"
             if git cat-file -e "${MERGE_BASE}:${path}" 2>/dev/null; then
