@@ -139,8 +139,9 @@ The workflow's deterministic steps are `agentspine review preflight|schema|post|
 from npm at the version that scaffolded the file, so the repository gets a workflow and no
 toolchain of its own. The workflow, the `pr-ci-review` skill and that tooling share a contract, and
 re-running with `--packs ci-review` updates the skill but never rewrites an existing workflow. To
-upgrade all three, delete the workflow and commit that, re-run `npx agentspine --yes --packs` with
-`ci-review` and every other pack you use, then re-apply any edits you had made to the workflow.
+upgrade all three, delete the workflow and commit that, re-run
+`npx agentspine --yes --packs ci-review,<every other pack you use>`, then re-apply any edits you had
+made to the workflow.
 
 The `anthropics/claude-code-action` pin also fixes which Claude Code runs the review, since the
 action bundles it; the [capability matrix](docs/capability-matrix.md#the-ci-reviews-lock-claude-code)
