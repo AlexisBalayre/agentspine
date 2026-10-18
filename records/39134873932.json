@@ -1,0 +1,68 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T14:13:39.628Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39134873932",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39134873932",
+  "actor": "AlexisBalayre",
+  "commit_sha": "a0e54d010b20124f7718e5af580a513ca9873664",
+  "source": "pr",
+  "pr_number": 38,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "docs",
+    "conventions"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "docs",
+    "conventions"
+  ],
+  "reviewers_skipped": [
+    "security",
+    "context",
+    "maintainability",
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "6648297e46b58c29e9bde21c7ceb848a4be4e78e",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 0.7709265,
+  "duration_ms": 76553,
+  "num_turns": 10,
+  "tokens": {
+    "input": 12,
+    "output": 5459,
+    "cache_read": 217710,
+    "cache_creation": 33884,
+    "total": 257065
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 24,
+      "output": 9490,
+      "cache_read": 333934,
+      "cache_creation": 62381,
+      "cost_usd": 0.6702397999999999
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 10,
+      "output": 1780,
+      "cache_read": 72196,
+      "cache_creation": 27371,
+      "cost_usd": 0.10068669999999999
+    }
+  ],
+  "permission_denials": []
+}
