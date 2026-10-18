@@ -1,0 +1,91 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T14:45:37.655Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39137187874",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39137187874",
+  "actor": "AlexisBalayre",
+  "commit_sha": "09d8c6a26dfbefbe7861c2d2c6a446682d50f948",
+  "source": "pr",
+  "pr_number": 41,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "maintainability",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "maintainability",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "context",
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "0721fe117b1aff93e1b6a0bb9632a42b600d734f",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "89",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The 'pull what the forge added, then retry' hint prints for every worktree gh checked and found unshipped, including plain unmerged work and branches with no PR, where pulling does nothing. Make it conditional, e.g. '(if the forge added commits to the PR, pull them and retry)'.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "52",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "An earlier release's worktree-create.sh had no name check, so it could create a dot-named worktree such as `.worktrees/.scratch`. Under the new `.*` rule, `worktree-remove.sh .scratch` prints 'Skipped' and exits 0, and `--merged` never visits it, so the only way out is a manual `git worktree remove`. Naming that in the message or the CHANGELOG would save users from a dead end.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.3551865,
+  "duration_ms": 139575,
+  "num_turns": 12,
+  "tokens": {
+    "input": 14,
+    "output": 8955,
+    "cache_read": 293405,
+    "cache_creation": 47751,
+    "total": 350125
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 30,
+      "output": 19870,
+      "cache_read": 453509,
+      "cache_creation": 101760,
+      "cost_usd": 1.1402747999999998
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 18,
+      "output": 4165,
+      "cache_read": 147782,
+      "cache_creation": 63379,
+      "cost_usd": 0.2149117
+    }
+  ],
+  "permission_denials": []
+}
