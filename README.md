@@ -164,7 +164,7 @@ A quick or area-restricted review is partial: the next review diffs from the las
 so what it skipped is covered then; comment `@claude review` for a complete pass now. The review
 adds its verdict to the comment as a reaction when it ends: 🚀 (no important findings), 👍 (no
 important findings from a partial review, which leaves the `claude-review` status to the last
-complete one), 👎 (important findings posted), or 😕 (not reviewed: the run failed or was cancelled).
+complete one, and on a head none has covered leaves it unset), 👎 (important findings posted), or 😕 (not reviewed: the run failed or was cancelled).
 A comment on a PR that closed before the review started gets no reaction, and neither does a
 request displaced from the queue by a later push, which never starts; comment again. If the
 Claude GitHub app is installed it also reacts 👀 to any `@claude` mention on its own.

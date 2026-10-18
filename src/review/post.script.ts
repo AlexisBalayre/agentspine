@@ -197,19 +197,20 @@ export function main(): number {
   } finally {
     const importants = anchored.length + unanchored.length;
     const failure = noVerdict ?? (reviewPosted ? null : "the review could not be posted");
-    // A quick or area-restricted pass is no merge signal, so it leaves the status
-    // to the last full review: setting one would turn that review's red green, or
-    // its green red. Only the reaction says how the pass went.
+    // A quick or area-restricted pass is no merge signal, so one that reaches a
+    // verdict leaves the status to the last full review, whose red it would
+    // otherwise turn green. One that dies still fails the check.
     const partial = env.REVIEW_PARTIAL === "true";
     const outcome = importants > 0 ? `${importants} important finding(s)` : "no blocking issues";
     const sha = env.REVIEW_COMMIT_SHA ?? "";
-    if (partial) {
-      process.stdout.write("partial pass; leaving the claude-review status as it is\n");
-    } else if (sha) {
-      if (failure) setCommitStatus(repository, sha, "failure", failure);
-      else setCommitStatus(repository, sha, "success", outcome);
-    } else {
+    if (!sha) {
       warn("no commit sha; skipping the claude-review status");
+    } else if (failure) {
+      setCommitStatus(repository, sha, "failure", failure);
+    } else if (partial) {
+      process.stdout.write("partial pass; leaving the claude-review status as it is\n");
+    } else {
+      setCommitStatus(repository, sha, "success", outcome);
     }
     // The workflow puts this reaction on the `@claude review` comment; a local
     // run has no step to hand it to.

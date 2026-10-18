@@ -214,13 +214,15 @@ jobs:
       # lists the gh and git verbs the protocol runs; Read, Glob, Grep and Agent
       # need no rule inside the checkout, and Claude Code's built-in read-only
       # commands (`ls`, `cat`, `head`, `grep`, `find`, `cd`, read-only `git`)
-      # run in every mode, a set no setting changes. Anything else is refused
+      # run in every mode; only an ask or deny rule narrows that set, as the
+      # `--output` deny below does for git. Anything else is refused
       # and lands in the record's permission_denials, so a verb the skill starts
       # using must be added here: dontAsk, the mode set here, denies whatever
       # would prompt, and a run in any other mode has nobody to answer the
       # prompt. Auto mode, whose classifier approves commands no rule names, is
-      # off. None of the verbs writes: the poster job is the review's only writer, so a PR whose diff
-      # tells the reviewer to post something has no channel to do it through.
+      # off. None of the verbs writes: the poster job is the review's only
+      # writer, so a PR whose diff tells the reviewer to post something has no
+      # channel to do it through.
       # `gh api` stays out because no deny pattern can hold it read-only: gh
       # bundles short flags (`-if body=x` is a POST). `git fetch` and `git
       # checkout` stay out because the only checkout the model could want

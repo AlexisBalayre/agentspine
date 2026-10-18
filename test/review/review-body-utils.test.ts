@@ -72,12 +72,14 @@ describe("commentBody", () => {
 
   // A body that leaves a fence open turns the inert fence into that block's close, and the
   // suggestion after it into markdown.
-  it("keeps a relocated suggestion inert when the body leaves a fence open", () => {
-    const posted = commentBody(
-      finding({ body: "See below\n````", suggestion: "```suggestion\nevil();\n```" }),
-      12,
-    );
-    expect(posted).not.toMatch(/^`{3,}suggestion/im);
+  it.each([
+    ["a backtick fence", "```suggestion\nevil();\n```", /^`{3,}suggestion/im],
+    ["a tilde fence", "~~~suggestion\nevil();\n~~~", /^~{3,}suggestion/im],
+    ["a quoted fence", "> ```suggestion\n> evil();", /^> `{3,}suggestion/im],
+    ["a raw pre block", '<pre lang="suggestion">evil();</pre>', /<pre/i],
+  ])("keeps %s in a relocated suggestion inert when the body leaves a fence open", (_label, suggestion, live) => {
+    const posted = commentBody(finding({ body: "See below\n````", suggestion }), 12);
+    expect(posted).not.toMatch(live);
   });
 
   it("posts a suggestion holding backtick runs verbatim, in a fence they cannot close", () => {
