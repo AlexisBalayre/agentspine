@@ -124,8 +124,8 @@ machine where the hooks run.
 decides full versus incremental, Claude Code reviews the PR through the `review` pack's seven
 reviewers, and a poster writes the verdict. **The model has no write access to the PR.** It emits a
 structured record; the poster renders it, anchors each important finding to a line in the diff, and
-pins a `claude-review` commit status. A run that dies, or that ends before every reviewer it
-spawned has reported, still posts "not reviewed" or "review incomplete" and fails the check,
+pins a `claude-review` commit status. A complete run that dies, or that ends before every reviewer
+it spawned has reported, still posts "not reviewed" or "review incomplete" and fails the check,
 because green silence reads exactly like a clean review.
 
 The model's job holds a read-only token, and its tools are locked by managed settings that no file
@@ -164,7 +164,9 @@ A quick or area-restricted review is partial: the next review diffs from the las
 so what it skipped is covered then; comment `@claude review` for a complete pass now. The review
 adds its verdict to the comment as a reaction when it ends: 🚀 (no important findings), 👍 (no
 important findings from a partial review, which leaves the `claude-review` status to the last
-complete one, and on a head none has covered leaves it unset), 👎 (important findings posted), or 😕 (not reviewed: the run failed or was cancelled).
+complete one, and on a head none has covered leaves it unset), 👎 (important findings posted), or
+😕 (not reviewed: the run failed or was cancelled). A partial review sets no status even when it
+fails; its 😕 and the failed `post-review` job show it.
 A comment on a PR that closed before the review started gets no reaction, and neither does a
 request displaced from the queue by a later push, which never starts; comment again. If the
 Claude GitHub app is installed it also reacts 👀 to any `@claude` mention on its own.

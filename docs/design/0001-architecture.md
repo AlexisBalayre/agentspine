@@ -834,8 +834,10 @@ workflow and global tooling install:
 
 - `@claude review` reads `full`, a depth (`quick`, `deep`) and reviewer areas from the comment. A
   quick or area-restricted round is **partial**: the preflight never takes one as the prior, so
-  the next round covers what it skipped. One that reaches a verdict sets no `claude-review`
-  status, so it never turns the last complete review's red green; one that dies still fails it.
+  the next round covers what it skipped. It sets no `claude-review` status, even when it fails: a
+  partial success would turn the last complete review's red green, and a partial failure its green
+  red, which no later partial pass could clear. Setting failure on a partial pass that died was
+  tried first and reverted for that reason; its 😕 reaction is the failure's only sign.
 - The poster hands back a reaction for the comment (🚀, 👍 when partial, 👎, 😕), and the workflow
   clears its earlier ones.
 - A `review-spec` reviewer holds the change against the issue it closes. Its findings never carry

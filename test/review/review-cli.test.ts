@@ -304,17 +304,16 @@ describe("the reaction the poster hands to the comment", () => {
     ["no important finding on a partial pass", verdict(), "true", "reaction=+1"],
     ["an important finding", verdict([UNANCHORED_IMPORTANT]), "false", "reaction=-1"],
     ["no verdict at all", "", "false", "reaction=confused"],
+    ["no verdict on a partial pass", "", "true", "reaction=confused"],
   ])("follows a round with %s", (_label, structuredOutput, partial, expected) => {
     expect(reaction(structuredOutput, partial).output).toContain(expected);
   });
 
-  it("leaves the commit status to the last full review after a partial pass reaches a verdict", () => {
-    expect(reaction(verdict(), "true").calls.some((call) => call.args.includes("/statuses/"))).toBe(false);
-  });
-
-  it("still fails the check when a partial pass reaches no verdict", () => {
-    const status = reaction("", "true").calls.find((call) => call.args.includes("/statuses/"));
-    expect(JSON.parse(status?.input ?? "{}")).toMatchObject({ state: "failure" });
+  it.each([
+    ["no verdict", ""],
+    ["no important finding", verdict()],
+  ])("leaves the commit status to the last full review after a partial pass with %s", (_label, structuredOutput) => {
+    expect(reaction(structuredOutput, "true").calls.some((call) => call.args.includes("/statuses/"))).toBe(false);
   });
 });
 
