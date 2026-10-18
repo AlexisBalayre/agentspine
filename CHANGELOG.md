@@ -17,6 +17,13 @@ repository means re-running `npx agentspine`.
   through parallel implementer subagents in their own worktrees, then a draft PR that is marked
   ready once every ticket lands. It is reviewed by the CI review where the repository runs it, and
   by `review-changes` otherwise.
+- `.agents/scripts/worktree-remove.sh <name>...` removes the named worktrees, and deletes each
+  one's branch once no work is lost: a merged pull request shipped its tip, or origin's copy holds
+  every commit. Origin's copy goes too on the merged-PR path, unless the branch moved past the
+  merged tip. A worktree with uncommitted or untracked files, or a detached HEAD, is kept, and so
+  is any branch outside `WORKTREE_BRANCH_PREFIX` or any branch at all when the fetch fails. The
+  merged-PR check needs an authenticated `gh`; without one, only origin's copy vouches for a
+  branch. `worktree-clean.sh` is unchanged and still force-removes.
 
 ### Changed
 

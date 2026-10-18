@@ -5,7 +5,7 @@ Vibe, and Cursor.
 
 ## Read first
 
-- [`docs/design/0001-architecture.md`](docs/design/0001-architecture.md) — the 29 decisions and
+- [`docs/design/0001-architecture.md`](docs/design/0001-architecture.md) — the 30 decisions and
   the cost accepted by each. Do not relitigate one without recording why.
 - [`docs/capability-matrix.md`](docs/capability-matrix.md) — what each tool actually supports.
   Verified from docs, with dates. If a claim here is not in that file, verify it before relying on it.
@@ -52,7 +52,8 @@ rather than repeating it.
   than assuming a layout.
 - The quality gate reads `.agents/quality.toml`.
 - Work on a change in its own worktree: `.agents/scripts/worktree-create.sh <name>`, configured by
-  `.agents/worktree.env`. `.agents/scripts/worktree-clean.sh` removes those whose branch merged.
+  `.agents/worktree.env`. `.agents/scripts/worktree-remove.sh <name>` removes one, and its branch
+  once no work is lost; `.agents/scripts/worktree-clean.sh` force-removes those whose branch merged.
 - Hook policies are shared shell scripts; each tool has a thin adapter in
   `.agents/hooks/adapters/`. The contract is `.agents/hooks/CONTRACT.md`.
 
