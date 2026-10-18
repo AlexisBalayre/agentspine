@@ -24,6 +24,21 @@ repository means re-running `npx agentspine`.
   is any branch outside `WORKTREE_BRANCH_PREFIX` or any branch at all when the fetch fails. The
   merged-PR check needs an authenticated `gh`; without one, only origin's copy vouches for a
   branch. `worktree-clean.sh` is unchanged and still force-removes.
+- A `review-spec` reviewer in the `review` pack, which holds a change against the issue or spec it
+  implements: requirements missing, partial or built wrong, and work no requirement asked for.
+  `pr-ci-review` spawns it when the PR closes an issue, `review-changes` when the change names a
+  spec (`--spec`). Its findings are never auto-fixed and never carry a committable suggestion,
+  since a fix written from issue text rests on whoever wrote the issue.
+- `@claude review` reads the words after it: `full`, a depth (`quick`, `deep`) and reviewer areas,
+  in any order. A quick or area-restricted review is partial: unless it fails, it leaves the
+  `claude-review` status to the last complete review, and the next review diffs from that one.
+  `deep` also runs the orchestrator at high effort.
+- The emitted workflow reacts to a `@claude review` comment with the verdict: 🚀, 👍 for a partial
+  review, 👎 when important findings were posted, 😕 when the run never reached one. The poster
+  job gains `issues: write` for it.
+- The metrics record carries `model_usage` (the run's tokens and cost split by model, subagents
+  included), `review_depth`, `review_areas` and `permission_denials`; `schema_version` is now 3.
+  `tokens` is labelled as the orchestrator's own turns, which it always was.
 
 ### Changed
 
@@ -75,6 +90,20 @@ repository means re-running `npx agentspine`.
   the head commit into a directory the step creates, and keeps a link the PR commits as a link.
 - A finding on a file the PR's `.gitattributes` marks `-diff` went to the review body instead of
   the line: the poster's diff printed "Binary files differ", which has no line to anchor to.
+
+### Security
+
+- The emitted review workflow locks the model's permissions in managed settings, which a PR's
+  files cannot widen: read-only `gh` and `git` verbs only, file edits denied in every mode, and
+  Bash in a sandbox that writes only to the checkout and Claude Code's temp directory, reaches only
+  `api.github.com`, and fails the run if it cannot start. Before, the skill's own `allowed-tools` (`Bash(git *)`, `Bash(gh *)`)
+  widened the workflow's allowlist, and the allowlist itself admitted `git grep -O` and `git
+  difftool`, both of which run a command, on a runner holding the Claude OAuth token. Credentials
+  are now also scrubbed from the model's shell.
+- Both review jobs keep their hand-off files under the runner's temp directory instead of the
+  checkout, which is the PR head: a fork could commit `posted.json` or `review-output/` as a
+  symlink the write would follow, or plant a `review-output/` the poster read as the verdict when
+  the review left none.
 
 ## 0.1.3 — 2026-09-22
 

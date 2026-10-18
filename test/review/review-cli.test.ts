@@ -206,14 +206,14 @@ describe("agentspine review metrics", () => {
     expect(result.status).toBe(0);
     const record = JSON.parse(readFileSync(output, "utf8"));
     expect(record).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       is_error: true,
       incomplete_reason: "Not reviewed: the review step's outcome was failure; re-run",
       pr_number: 7,
       comments_posted_actual: 1,
       reviewers_spawned: ["correctness"],
       reviewers_returned: ["correctness"],
-      reviewers_skipped: ["security", "conventions", "context", "maintainability", "docs"],
+      reviewers_skipped: ["security", "conventions", "context", "maintainability", "docs", "spec"],
     });
   });
 });
@@ -246,6 +246,164 @@ describe("agentspine review metrics, on a round with no verdict", () => {
       is_error: false,
       incomplete_reason: null,
     });
+  });
+});
+
+const verdict = (findings: object[] = []) =>
+  JSON.stringify({ ...JSON.parse(importantAt("2")), findings });
+
+// No file, so the poster lists it in the review body without diffing anything.
+const UNANCHORED_IMPORTANT = {
+  file: null,
+  line: null,
+  area: "correctness",
+  confidence: "high",
+  tag: "important",
+  description: "the description",
+  body: null,
+  suggestion: null,
+};
+
+describe("the review a `@claude review` comment asked for", () => {
+  const record = (env: Record<string, string>) => {
+    const fx = fixture();
+    const output = path.join(fx.dir, "record.json");
+    runReview("metrics", fx, { REVIEW_STEP_OUTCOME: "success", REVIEW_METRICS_OUTPUT: output, ...env });
+    return JSON.parse(readFileSync(output, "utf8"));
+  };
+
+  it("is recorded with the run", () => {
+    expect(
+      record({ REVIEW_STRUCTURED_OUTPUT: verdict(), REVIEW_COMMENT: "@claude review quick security docs" }),
+    ).toMatchObject({ review_depth: "quick", review_areas: ["security", "docs"] });
+  });
+
+  it("records as a standard review of the gated areas when no comment asked", () => {
+    expect(record({ REVIEW_STRUCTURED_OUTPUT: verdict() })).toMatchObject({
+      review_depth: "standard",
+      review_areas: [],
+    });
+  });
+});
+
+describe("the reaction the poster hands to the comment", () => {
+  const reaction = (structuredOutput: string, partial: string) => {
+    const fx = fixture();
+    const output = path.join(fx.dir, "output.txt");
+    runReview("post", fx, {
+      REVIEW_STEP_OUTCOME: "success",
+      REVIEW_STRUCTURED_OUTPUT: structuredOutput,
+      REVIEW_PARTIAL: partial,
+      GITHUB_OUTPUT: output,
+    });
+    return { output: readFileSync(output, "utf8"), calls: calls(fx.log) };
+  };
+
+  it.each([
+    ["no important finding", verdict(), "false", "reaction=rocket"],
+    ["no important finding on a partial pass", verdict(), "true", "reaction=+1"],
+    ["an important finding", verdict([UNANCHORED_IMPORTANT]), "false", "reaction=-1"],
+    ["no verdict at all", "", "false", "reaction=confused"],
+  ])("follows a round with %s", (_label, structuredOutput, partial, expected) => {
+    expect(reaction(structuredOutput, partial).output).toContain(expected);
+  });
+
+  it("leaves the commit status to the last full review after a partial pass reaches a verdict", () => {
+    expect(reaction(verdict(), "true").calls.some((call) => call.args.includes("/statuses/"))).toBe(false);
+  });
+
+  it("still fails the check when a partial pass reaches no verdict", () => {
+    const status = reaction("", "true").calls.find((call) => call.args.includes("/statuses/"));
+    expect(JSON.parse(status?.input ?? "{}")).toMatchObject({ state: "failure" });
+  });
+});
+
+describe("agentspine review metrics, from the action's execution file", () => {
+  // The shape claude-code-action writes: the raw result message, whose `usage` covers the
+  // orchestrator's own turns only while `total_cost_usd` and `modelUsage` cover every subagent.
+  const RESULT = {
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    duration_ms: 44969,
+    num_turns: 6,
+    total_cost_usd: 0.45,
+    usage: { input_tokens: 8, output_tokens: 2900, cache_read_input_tokens: 104026, cache_creation_input_tokens: 38025 },
+    modelUsage: {
+      "claude-opus-5-5": {
+        inputTokens: 8,
+        outputTokens: 2900,
+        cacheReadInputTokens: 104026,
+        cacheCreationInputTokens: 38025,
+        webSearchRequests: 0,
+        costUSD: 0.3,
+        contextWindow: 1000000,
+        maxOutputTokens: 128000,
+      },
+      "claude-sonnet-5-5": {
+        inputTokens: 12,
+        outputTokens: 4100,
+        cacheReadInputTokens: 210000,
+        cacheCreationInputTokens: 30000,
+        webSearchRequests: 0,
+        costUSD: 0.15,
+        contextWindow: 1000000,
+        maxOutputTokens: 128000,
+      },
+    },
+  };
+
+  const run = (result: object) => {
+    const fx = fixture();
+    const executionFile = path.join(fx.dir, "execution.json");
+    writeFileSync(executionFile, JSON.stringify([{ type: "system", subtype: "init" }, result]));
+    const output = path.join(fx.dir, "record.json");
+    const summary = path.join(fx.dir, "summary.md");
+    runReview("metrics", fx, {
+      REVIEW_STEP_OUTCOME: "success",
+      REVIEW_STRUCTURED_OUTPUT: verdict(),
+      REVIEW_EXECUTION_FILE: executionFile,
+      REVIEW_METRICS_OUTPUT: output,
+      GITHUB_STEP_SUMMARY: summary,
+    });
+    return { record: JSON.parse(readFileSync(output, "utf8")), summary: readFileSync(summary, "utf8") };
+  };
+
+  it("splits the spend by model across the orchestrator and its subagents", () => {
+    expect(run(RESULT).record.model_usage).toEqual([
+      { model: "claude-opus-5-5", input: 8, output: 2900, cache_read: 104026, cache_creation: 38025, cost_usd: 0.3 },
+      { model: "claude-sonnet-5-5", input: 12, output: 4100, cache_read: 210000, cache_creation: 30000, cost_usd: 0.15 },
+    ]);
+  });
+
+  it("keeps the orchestrator-only tokens apart from the split, and labels them so", () => {
+    const { record, summary } = run(RESULT);
+    expect(record.tokens.total).toBe(8 + 2900 + 104026 + 38025);
+    expect(summary).toContain("| Cost: claude-opus-5-5 | 0.3000 |");
+    expect(summary).toContain("| Cost: claude-sonnet-5-5 | 0.1500 |");
+    expect(summary).toContain("| Tokens (orchestrator) | 144959 |");
+  });
+
+  it("records no split when the result carries none", () => {
+    const { modelUsage: _modelUsage, ...withoutSplit } = RESULT;
+    expect(run(withoutSplit).record.model_usage).toBeNull();
+  });
+
+  it("records each denied tool call by tool, with a Bash call's command as its input", () => {
+    const denials = [{ tool_name: "Bash", tool_use_id: "toolu_1", tool_input: { command: "npm test" } }];
+    const { record, summary } = run({ ...RESULT, permission_denials: denials });
+    expect(record.permission_denials).toEqual([{ tool: "Bash", input: "npm test" }]);
+    expect(summary).toContain("| Permission denials | 1 |");
+  });
+
+  // The record is published on a branch, and a denied Write would otherwise carry a whole file.
+  it("keeps at most 200 characters of a denied call's input", () => {
+    const denials = [{ tool_name: "Write", tool_use_id: "toolu_1", tool_input: { content: "x".repeat(1000) } }];
+    expect(run({ ...RESULT, permission_denials: denials }).record.permission_denials[0].input).toHaveLength(200);
+  });
+
+  it("records the denials as unknown when the result carries no list", () => {
+    expect(run(RESULT).record.permission_denials).toBeNull();
   });
 });
 
