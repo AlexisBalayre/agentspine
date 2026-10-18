@@ -1,0 +1,136 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T13:50:14.496Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39132897715",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39132897715",
+  "actor": "AlexisBalayre",
+  "commit_sha": "3fcd691bb0f67b5b1e4843ebc511c6ca6cd58022",
+  "source": "pr",
+  "pr_number": 38,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "spec"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "197-198",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "If RESTORE_PATHS lists a path and also something under it (e.g. \".agents .agents/skills\"), the second pass lists the same symlink entry again, `ln -s --` fails with \"File exists\", and under bash -e the step dies. The old `cp -R` tolerated this. The shipped lists don't overlap; `ln -sfn --` or a note that entries must not overlap would close it.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "191-193",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The info/exclude append is the one non-obvious line in the new block without a why comment. It keeps the snapshot out of `git status`, so the clean-tree checks stay clean. Without that said, a maintainer could delete it as dead weight.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "188-202",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The `.claude-pr-agents` literal is repeated across the workflow step (5x), SKILL.md, tests and docs. Nothing ties SKILL.md's pointer to the directory the step writes, so a rename in one place would leave reviewers reading a path that no longer exists, with no failing test.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/review/review-cli.test.ts",
+      "line": "444",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "restoreRepo hardcodes RESTORE_PATHS \"AGENTS.md .agents\", while this repo's workflow runs \"AGENTS.md .agents templates\". The cross-path behavior is therefore tested on a different list from the one that ships here.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "230",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "`rm -rf \"$path\"` follows a symlink the PR commits as a leading component of a multi-component RESTORE_PATHS entry (e.g. `shared/agents` with `shared` committed as a link), deleting outside the checkout. The shipped single-component entries are not exposed, but the RESTORE_PATHS comment invites adding nested directories.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "security",
+      "description": "A `git ls-tree` call needed approval and did not run. The reviewer confirmed the tree layout by listing the restored checkout instead. The claude-code-action source was not readable, so the claim that it empties `.claude-pr/` (restore-config.ts:280) went unverified by context, docs and security."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 2.4959823,
+  "duration_ms": 261076,
+  "num_turns": 12,
+  "tokens": {
+    "input": 12,
+    "output": 11413,
+    "cache_read": 228390,
+    "cache_creation": 64674,
+    "total": 304489
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 48,
+      "output": 44002,
+      "cache_read": 886636,
+      "cache_creation": 167850,
+      "cost_usd": 2.0908312
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 30,
+      "output": 9555,
+      "cache_read": 268868,
+      "cache_creation": 102307,
+      "cost_usd": 0.4051511
+    }
+  ],
+  "permission_denials": [
+    {
+      "tool": "Bash",
+      "input": "git ls-tree HEAD -- .agents AGENTS.md templates .claude .claude-pr .claude-pr-agents"
+    },
+    {
+      "tool": "Bash",
+      "input": "sed -n 400,424p test/review/review-cli.test.ts; grep -n \"RESTORE_PATHS\" .claude-pr-agents/templates/github/workflows/claude-code-review.yml | head -3; diff <(sed -n '/name: Restore startup config from"
+    }
+  ]
+}
