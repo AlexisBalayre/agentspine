@@ -986,7 +986,8 @@ Three holes in remove come with it, each with a test watched failing:
 - The prefix check ran after `git worktree remove`, so a clean worktree another tool made under
   `.worktrees/`, on a branch of its own, was removed. It now runs first, and keeps that worktree.
 - A name was not checked, so `../../sibling` removed a worktree outside `.worktrees/`. Remove and
-  create now take letters, digits, `.`, `_` and `-` only, never a leading `-`.
+  create now take letters, digits, `.`, `_` and `-` only, never a leading `.` or `-`. The `--merged`
+  glob skips dot-named directories, so a leading dot would make a worktree it never visits.
 - Any merged pull request counted, including a stacked one merged into its parent's branch, whose
   commits had not reached the trunk. Only a pull request into the default branch counts now.
 
@@ -998,6 +999,10 @@ Three holes in remove come with it, each with a test watched failing:
 
 - **Cost accepted:** a repository scaffolded earlier keeps its `worktree-clean.sh`, since
   re-scaffolding deletes nothing, as with `resolving-merge-conflicts`. Its `AGENTS.md` bullet
-  stops naming the script.
+  stops naming the script once a re-scaffold rewrites the managed block.
 - **Cost accepted:** in a repository whose trunk is not its default branch, no pull request into
   the trunk counts as shipped, so a squash-merged branch is kept until someone deletes it by hand.
+- **Cost accepted:** a tip that a merged pull request holds only as an ancestor of its head, as
+  after the forge's "Update branch" or an accepted suggestion, does not count as shipped. `--merged`
+  keeps that worktree and says to pull and retry. Counting an ancestor would need the merged head
+  locally, which a squash merge whose branch the forge deleted never provides.

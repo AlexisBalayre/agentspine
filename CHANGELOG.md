@@ -26,7 +26,7 @@ workflow and committing the deletion, then re-running
   HEAD, or a branch outside `WORKTREE_BRANCH_PREFIX` is kept, and so is every branch when the
   fetch fails. The merged-PR check needs an authenticated `gh`; without one, only origin's copy
   vouches for a branch. `--merged` in place of names does the same for every worktree whose tip a
-  merged pull request shipped, and keeps the rest.
+  merged pull request shipped, keeps the rest, and exits 1 when the fetch or `gh` cannot answer.
 - A `review-spec` reviewer in the `review` pack, which holds a change against the issue or spec it
   implements: requirements missing, partial or built wrong, and work no requirement asked for.
   `pr-ci-review` spawns it when the PR closes an issue, `review-changes` when the change names a
@@ -46,7 +46,8 @@ workflow and committing the deletion, then re-running
 ### Changed
 
 - `worktree-create.sh` takes a name of letters, digits, `.`, `_` and `-` only, not starting with
-  `-`, so a name cannot place a worktree outside `.worktrees/`.
+  `.` or `-`, so a name cannot place a worktree outside `.worktrees/`, or where `--merged` never
+  looks.
 - `planning` now installs `review` as well, since `implement-spec` invokes `pr-description` and
   `review-changes`. `--packs planning` therefore also installs the seven reviewer agents.
 - The wizard's `template.sh` writes values single-quoted and reads them back intact, writes

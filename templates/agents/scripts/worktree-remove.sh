@@ -7,7 +7,8 @@
 # is kept; ignored files (.env, node_modules) go with it. Its branch is deleted once a pull request
 # merged into the default branch shipped its tip (and origin's copy too, while still at that tip),
 # or once origin's copy holds every commit; otherwise it is kept. A failed fetch keeps every
-# branch, and makes --merged remove nothing. The merged-PR check needs an authenticated `gh`.
+# branch. --merged exits 1 when the fetch fails, removing nothing, or when gh cannot answer for a
+# worktree, which it keeps. The merged-PR check needs an authenticated `gh`.
 # Branch prefix comes from .agents/worktree.env (default: feature).
 set -euo pipefail
 
@@ -21,10 +22,11 @@ PREFIX="${WORKTREE_BRANCH_PREFIX:-feature}"
 USAGE="Usage: .agents/scripts/worktree-remove.sh <name>... | --merged"
 [ $# -gt 0 ] || { echo "$USAGE" >&2; exit 1; }
 MERGED_ONLY=0
-if [ "$1" = "--merged" ]; then
-  [ $# -eq 1 ] || { echo "$USAGE" >&2; exit 1; }
-  MERGED_ONLY=1
-fi
+for ARG in "$@"; do
+  [ "$ARG" != "--merged" ] || MERGED_ONLY=1
+done
+[ "$MERGED_ONLY" = 0 ] || [ $# -eq 1 ] || { echo "$USAGE" >&2; exit 1; }
+STATUS=0
 
 # A stale origin ref could vouch for commits the remote no longer has, so without a fresh fetch
 # every branch is kept.
@@ -45,9 +47,10 @@ if [ "$MERGED_ONLY" = 1 ]; then
 fi
 
 for NAME in "$@"; do
+  # worktree-create.sh holds names to the same rule. No leading dot: the glob above skips those.
   case "$NAME" in
-    '' | -* | */* | *..* | *[!A-Za-z0-9._-]*)
-      echo "Skipped '$NAME': not a worktree name (letters, digits, . _ - only; no leading dash)" >&2
+    '' | -* | .* | */* | *..* | *[!A-Za-z0-9._-]*)
+      echo "Skipped '$NAME': not a worktree name (letters, digits, . _ - only; no leading . or -)" >&2
       continue ;;
   esac
   WORKTREE_DIR=".worktrees/$NAME"
@@ -56,7 +59,10 @@ for NAME in "$@"; do
     continue
   fi
 
-  BRANCH=$(git -C "$WORKTREE_DIR" branch --show-current)
+  if ! BRANCH=$(git -C "$WORKTREE_DIR" branch --show-current 2>/dev/null); then
+    echo "Kept $WORKTREE_DIR: git cannot read it as a worktree" >&2
+    continue
+  fi
   if [ -z "$BRANCH" ]; then
     echo "Kept $WORKTREE_DIR: detached HEAD, whose commits no branch may hold" >&2
     continue
@@ -80,9 +86,10 @@ for NAME in "$@"; do
   fi
   if [ "$MERGED_ONLY" = 1 ] && [ "$SHIPPED" = 0 ]; then
     if [ "$CHECKED" = 1 ]; then
-      echo "Kept $WORKTREE_DIR: no PR merged into $TRUNK shipped its tip" >&2
+      echo "Kept $WORKTREE_DIR: no PR merged into $TRUNK has its tip as head (pull what the forge added, then retry)" >&2
     else
       echo "Kept $WORKTREE_DIR: gh could not say whether a merged PR shipped its tip" >&2
+      STATUS=1
     fi
     continue
   fi
@@ -116,3 +123,4 @@ for NAME in "$@"; do
     echo "Kept branch $BRANCH: it has commits origin does not hold, and gh could not say whether a merged PR shipped them" >&2
   fi
 done
+exit "$STATUS"

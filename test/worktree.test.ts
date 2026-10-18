@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -102,7 +102,7 @@ describe("worktree scripts", () => {
     expect(run(CREATE, repo, "broken").status).not.toBe(0);
   });
 
-  it.each(["../outside", "a/b", "-f", "a b"])("refuses %s as a worktree name", (name) => {
+  it.each(["../outside", "a/b", "-f", "a b", ".scratch"])("refuses %s as a worktree name", (name) => {
     const repo = repoWithOrigin();
     const { status, stderr } = run(CREATE, repo, name);
     expect(status).toBe(1);
@@ -319,7 +319,7 @@ describe("worktree-remove --merged", () => {
     expect(originHas(repo, "feature/shipped")).toBe(false);
     expect(existsSync(open.dir)).toBe(true);
     expect(hasBranch(repo, "feature/open")).toBe(true);
-    expect(stderr).toContain("Kept .worktrees/open: no PR merged into main shipped its tip");
+    expect(stderr).toContain("Kept .worktrees/open: no PR merged into main has its tip as head");
     expect(existsSync(path.join(repo, ".worktrees/other"))).toBe(true);
   });
 
@@ -339,9 +339,24 @@ describe("worktree-remove --merged", () => {
     const { dir } = worktreeWithCommit(repo, "unknown");
     git(repo, "push", "-q", "origin", "feature/unknown");
 
-    const { stderr } = remove(repo, NO_GH, "--merged");
+    const { status, stderr } = remove(repo, NO_GH, "--merged");
+    expect(status).toBe(1);
     expect(existsSync(dir)).toBe(true);
     expect(stderr).toContain("gh could not say whether a merged PR shipped its tip");
+  });
+
+  it("keeps a worktree git cannot read, and carries on with the rest", () => {
+    const repo = repoWithOrigin();
+    git(repo, "push", "-q", "origin", "main");
+    const stale = worktreeWithCommit(repo, "a-stale");
+    const shipped = worktreeWithCommit(repo, "b-shipped");
+    rmSync(path.join(repo, ".git/worktrees/a-stale"), { recursive: true });
+
+    const { status, stderr } = remove(repo, `echo ${shipped.tip}`, "--merged");
+    expect(status, stderr).toBe(0);
+    expect(stderr).toContain("Kept .worktrees/a-stale: git cannot read it as a worktree");
+    expect(existsSync(stale.dir)).toBe(true);
+    expect(existsSync(shipped.dir)).toBe(false);
   });
 
   it("fails without removing anything when the fetch fails", () => {
@@ -354,9 +369,15 @@ describe("worktree-remove --merged", () => {
     expect(existsSync(dir)).toBe(true);
   });
 
-  it("takes no names alongside the flag", () => {
+  it.each([
+    ["--merged", "extra"],
+    ["extra", "--merged"],
+  ])("takes no names alongside the flag (%s %s)", (...args) => {
     const repo = repoWithOrigin();
-    expect(remove(repo, NO_GH, "--merged", "extra").status).toBe(1);
+    const { dir, tip } = worktreeWithCommit(repo, "extra");
+    git(repo, "push", "-q", "origin", "feature/extra");
+    expect(remove(repo, `echo ${tip}`, ...args).status).toBe(1);
+    expect(existsSync(dir)).toBe(true);
   });
 });
 

@@ -53,7 +53,8 @@ rather than repeating it.
 - The quality gate reads `.agents/quality.toml`.
 - Work on a change in its own worktree: `.agents/scripts/worktree-create.sh <name>`, configured by
   `.agents/worktree.env`. `.agents/scripts/worktree-remove.sh <name>` removes one, and its branch
-  once no work is lost; `--merged` in place of names does the same for every worktree whose PR merged.
+  once no work is lost; `--merged` in place of names does the same for every worktree whose PR
+  merged into the default branch.
 - Hook policies are shared shell scripts; each tool has a thin adapter in
   `.agents/hooks/adapters/`. The contract is `.agents/hooks/CONTRACT.md`.
 
