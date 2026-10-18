@@ -37,7 +37,7 @@ git fetch --prune --quiet origin || { FETCHED=0; echo "Fetch failed: keeping eve
 # Only a PR into the default branch shipped anything: one merged into another feature branch, as
 # a stacked PR is, has not reached it yet.
 TRUNK=""
-[ "$FETCHED" = 1 ] && TRUNK=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null || true)
+[ "$FETCHED" = 1 ] && TRUNK=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name || true)
 
 if [ "$MERGED_ONLY" = 1 ]; then
   set --
@@ -77,16 +77,17 @@ for NAME in "$@"; do
   TIP=$(git rev-parse "refs/heads/$BRANCH")
   # A squash merge leaves the tip off the trunk, so only the forge knows it shipped. Without a
   # working gh that question gets no answer, and only origin's own copy can vouch for the branch.
+  # gh's stderr stays visible, since only its error says why it could not answer.
   CHECKED=0
   SHIPPED=0
   if [ "$FETCHED" = 1 ] && [ -n "$TRUNK" ] &&
-    MERGED_TIPS=$(gh pr list --head "$BRANCH" --base "$TRUNK" --state merged --json headRefOid --jq '.[].headRefOid' 2>/dev/null); then
+    MERGED_TIPS=$(gh pr list --head "$BRANCH" --base "$TRUNK" --state merged --json headRefOid --jq '.[].headRefOid'); then
     CHECKED=1
     printf '%s\n' "$MERGED_TIPS" | grep -Fx "$TIP" >/dev/null && SHIPPED=1
   fi
   if [ "$MERGED_ONLY" = 1 ] && [ "$SHIPPED" = 0 ]; then
     if [ "$CHECKED" = 1 ]; then
-      echo "Kept $WORKTREE_DIR: no PR merged into $TRUNK has its tip as head (pull what the forge added, then retry)" >&2
+      echo "Kept $WORKTREE_DIR: no PR merged into $TRUNK has its tip as head (if the forge added commits to the PR, pull them and retry)" >&2
     else
       echo "Kept $WORKTREE_DIR: gh could not say whether a merged PR shipped its tip" >&2
       STATUS=1

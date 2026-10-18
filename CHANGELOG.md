@@ -47,7 +47,8 @@ workflow and committing the deletion, then re-running
 
 - `worktree-create.sh` takes a name of letters, digits, `.`, `_` and `-` only, not starting with
   `.` or `-`, so a name cannot place a worktree outside `.worktrees/`, or where `--merged` never
-  looks.
+  looks. A dot-named worktree an earlier release created is out of both scripts' reach: remove it
+  with `git worktree remove .worktrees/<name>`.
 - `planning` now installs `review` as well, since `implement-spec` invokes `pr-description` and
   `review-changes`. `--packs planning` therefore also installs the seven reviewer agents.
 - The wizard's `template.sh` writes values single-quoted and reads them back intact, writes

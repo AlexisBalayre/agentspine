@@ -39,7 +39,7 @@ function run(script: string, cwd: string, ...args: string[]) {
 /**
  * Runs worktree-remove.sh with `gh` replaced by a stub, so no test reaches the real forge: the
  * stub names `main` as the default branch, and its body decides what a merged-PR lookup answers.
- * `exit 1` stands for a gh that is missing or not signed in.
+ * `NO_GH` stands for a gh that is missing or not signed in.
  */
 function remove(cwd: string, ghBody: string, ...names: string[]) {
   const bin = mkdtempSync(path.join(tmpdir(), "agentspine-gh-"));
@@ -54,7 +54,7 @@ function remove(cwd: string, ghBody: string, ...names: string[]) {
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-const NO_GH = "exit 1";
+const NO_GH = "echo 'gh: not signed in' >&2; exit 1";
 
 /** A worktree on `feature/<name>` carrying one commit of its own. */
 function worktreeWithCommit(repo: string, name: string) {
@@ -343,6 +343,7 @@ describe("worktree-remove --merged", () => {
     expect(status).toBe(1);
     expect(existsSync(dir)).toBe(true);
     expect(stderr).toContain("gh could not say whether a merged PR shipped its tip");
+    expect(stderr).toContain("gh: not signed in");
   });
 
   it("keeps a worktree git cannot read, and carries on with the rest", () => {
