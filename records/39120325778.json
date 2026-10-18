@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T10:45:11.123Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39120325778",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39120325778",
+  "actor": "AlexisBalayre",
+  "commit_sha": "2e4078b1f7171b74a619e4de00e962ea9d1eced4",
+  "source": "pr",
+  "pr_number": 34,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "context",
+    "maintainability"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "404c2ce868492c6374792a511ac8f6990dc7f29b",
+  "prior_importants": [
+    {
+      "file": "templates/agents/skills/wizard/template.sh",
+      "line": "146-157",
+      "status": "resolved"
+    }
+  ],
+  "findings": [],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "RESTORE_PATHS names `AGENTS.md .agents templates`, but `.claude-pr/` held only `.claude` and `CLAUDE.md`. The head's copies of the restored paths were never snapshotted there. Reviewers read the PR's versions with `git show 2e4078b:<path>` instead, so coverage did not suffer, but the workflow's snapshot step looks like it is not preserving those paths."
+    },
+    {
+      "component": "orchestrator",
+      "description": "Skipped `maintainability` and `context` for this incremental delta (about 79 lines). The only logic change is one `chmod` line plus a new test file, and no spec, protocol or infra surface was touched."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.0255453,
+  "duration_ms": 96548,
+  "num_turns": 9,
+  "tokens": {
+    "input": 10,
+    "output": 5917,
+    "cache_read": 173603,
+    "cache_creation": 35820,
+    "total": 215350
+  }
+}
