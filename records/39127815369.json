@@ -1,0 +1,222 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T12:44:47.212Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39127815369",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39127815369",
+  "actor": "AlexisBalayre",
+  "commit_sha": "73030bc249d794a975ad07d67a61eef5185fb318",
+  "source": "pr",
+  "pr_number": 37,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "correctness",
+    "security",
+    "security",
+    "maintainability",
+    "context",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "correctness",
+    "security",
+    "security",
+    "maintainability",
+    "context",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "src/review/review-body.utils.ts",
+      "line": "51-60",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "On a relocated anchor, a finding body ending in an open code fence lets the suggestion text render as raw markdown, so a ```suggestion block inside it becomes a committable suggestion on a line the finding never mentioned.",
+      "body": "`inertFences` neutralises the body's fence info strings, but nothing stops the body from leaving a fence **open**. An unclosed bare opener such as ```` ```` ```` has an empty info string, so `isPlainLanguage(\"\")` keeps it as written. Then the plain fence `commentBody` wraps around a relocated suggestion *closes* the body's fence instead of opening its own. In CommonMark a closing fence only has to be the same character, at least as long as the opener, and carry no info string. The suggestion text then renders as markdown, and on this path it never goes through `inertFences`.\n\nWorked example: `body = \"See below\\n````\"` and `suggestion = \"```suggestion\\nevil();\\n```\"`. The suggestion's longest backtick run is 3, so `fence` is 4 backticks:\n\n```\nSee below\n````            <- body opener, kept by inertFences\n\n````            <- poster's \"inert\" fence closes the body's block\n```suggestion   <- live suggestion block\nevil();\n```\n````            <- opens an empty block to end of comment\n```\n\nThe result is a \"Commit suggestion\" button on the relocated anchor, which is exactly what the comment at L57-59 says must not happen. Both fields are model output that can quote PR-author text. `post.script.ts` passes `commentBody(...)` straight through, the schema doesn't constrain content, and the only relocated-suggestion test (`test/review/review-body-utils.test.ts:67-70`) uses a plain body.\n\nThe base had simpler routes to the same outcome (no `inertFences`, a fixed 3-backtick fence), and this PR closes those. This is the one its hardening leaves open.\n\n```ts\n  parts.push(inertFences(finding.body ?? finding.description));\n  if (finding.suggestion !== null) {\n    ...\n    parts.push(\"\", relocatedFrom === null ? `${fence}suggestion` : fence, finding.suggestion, fence);\n```\n\nFix: on the relocated path, show the text through `inertFences`. That is safe because it is displayed there, never committed, and `inertFences` doesn't change backtick runs, so `fence` stays valid. Please also add a test with body `\"x\\n````\"` and a relocated suggestion that holds a ```` ```suggestion ```` block.\n\n<https://github.com/AlexisBalayre/agentspine/blob/73030bc249d794a975ad07d67a61eef5185fb318/src/review/review-body.utils.ts#L51-L60>",
+      "suggestion": "    parts.push(\n      \"\",\n      relocatedFrom === null ? `${fence}suggestion` : fence,\n      relocatedFrom === null ? finding.suggestion : inertFences(finding.suggestion),\n      fence,\n    );"
+    },
+    {
+      "file": "src/review/post.script.ts",
+      "line": "202-207",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "A quick or area-restricted pass still sets the claude-review status to success, so a red \"Not reviewed\" or \"2 important finding(s)\" status at the same head turns green after `@claude review quick`, contradicting the code's own comment that a partial pass is no merge signal.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/skills/pr-ci-review/SKILL.md",
+      "line": "107",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The skill and the workflow comment (claude-code-review.yml L237) say the lock refuses anything outside the listed git/gh verbs, but under this run `cat`, `sed -n`, `ls` and `cd <checkout> && git …` ran inside the checkout without a rule (likely Claude Code's built-in read-only auto-approval), so reviewers are told to avoid usable commands and those calls never show up in permission_denials.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "src/review/review-body.utils.ts",
+      "line": "135",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The rule that \"spec\" is conditional is hand-copied as `!== \"spec\"` in preflight.utils.ts:49 and review-body.utils.ts:135, but metrics.script.ts:180 reviewersSkipped still filters all of REVIEWER_AREAS, so the v3 metrics record lists spec as skipped on every PR that closes no issue while the review body does not; one exported CONDITIONAL_AREAS constant would keep the three consumers aligned.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "src/review/metrics.script.ts",
+      "line": "239",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Preflight already exposes depth, areas and partial as step outputs, but only partial is passed to post-review; metrics.script re-parses the raw REVIEW_COMMENT by importing parseReviewRequest from preflight.utils, coupling two entrypoints and giving the poster's partial flag and the recorded depth/areas two separate sources.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "270",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`disableAutoMode` is written at the top level of the managed settings, but the settings reference appears to place it under `permissions` beside `disableBypassPermissionsMode` (the matrix lists the two inconsistently); if misplaced it is silently ignored, though `defaultMode: \"dontAsk\"` limits the effect.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "242-253",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The comment says the action's tag mode passes `acceptEdits`, but this workflow supplies a `prompt`, which likely selects agent mode instead; if acceptEdits does apply it auto-approves mkdir/rm/mv/cp/sed in the checkout without an allow rule, which weakens \"None of the verbs writes\" (sandbox still confines writes to the checkout).",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "149-181",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The workflow rests on claude-code-action behaviours the matrix lacks, with no source or date: its tag mode passes `--permission-mode acceptEdits`, and naming Glob/Grep in `--allowedTools` is what puts them in the tool set on Linux.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "149-181",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The matrix has no source or date for the claim that gh bundles short flags (`-if body=x` is a POST), which decision 31 and the workflow comment cite as the reason `gh api` is dropped.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "149-181",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Workflow-level facts have no sourced entry: the reactions API living under `issues: write`, and Ubuntu 24.04 AppArmor restricting unprivileged user namespaces (the new step sets `kernel.apparmor_restrict_unprivileged_userns=0`).",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "193-340",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new workflow comments are very long and mix non-obvious whys with narration of what the config does (e.g. \"`allow` lists every Bash verb the protocol runs\", the paragraph restating each deny pattern), duplicated in the template twin; AGENTS.md says comments are for a non-obvious why only.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "855",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Decision 31's \"The scrub keeps credentials out of anything the model could print into the record\" overclaims: the workflow, README and matrix all say the scrub deliberately leaves the job's read-only GH_TOKEN, which is still printable via `gh --jq '$ENV.X'`.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/agents/review-correctness.md",
+      "line": null,
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The added sentence in review-correctness.md and review-security.md (and their .claude/agents copies) opens with the bare fragment \"Not under CI.\", which reads as a heading; the following \"When your brief says the run is CI…\" already carries the condition.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "445-449",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "On an issue_comment run the poster checks out the default branch, so `git checkout \"$REVIEW_COMMIT_SHA\"` cannot resolve a fork PR's head commit and no verdict is posted; the base has the same step.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "206-208",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "The config-restore step writes into `.claude-pr/` inside the PR-head checkout, and `mkdir -p` accepts a committed `.claude-pr` symlink, so `cp -R` copies the head's AGENTS.md/.agents (and templates here) wherever that symlink points: the same symlink-following-write class this PR fixed for the hand-off files.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "274-310",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "important",
+      "description": "The lock limits writes and network but not reads: an allowed verb (`git diff --no-index /dev/null <any path>`) reads files outside the checkout, so a credential readable on the runner can reach the posted record and the uploaded execution.json, bypassing the env scrub.",
+      "refutation": "The read path is real (`Bash(git diff *)` admits `--no-index`, and no denyRead is set), but the gap is pre-existing and the PR narrows it. The base allowed Read on any path, `git diff*` (which also matched difftool), no sandbox and no scrub. The PR also does not claim reads are confined: the matrix says \"reads are not restricted\". No credential is shown to be reachable. The OAuth token is passed as env and is not shown on disk. /proc/<pid>/environ reports size 0, which git --no-index likely reads as empty. The only on-disk token is the read-only, expiring GITHUB_TOKEN the PR already accepts. With the credential leg unproven and the trigger owner-gated, this does not reach important."
+    }
+  ],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "The `.claude-pr/` snapshot held only .claude/, .gitmodules and CLAUDE.md, with no AGENTS.md, .agents or templates, even though RESTORE_PATHS names them. Reviewers read the PR's copies with `git show HEAD:<path>` instead."
+    },
+    {
+      "component": "platform",
+      "description": "One reviewer's Bash call failed under the sandbox with `bwrap: Can't get type of source .git/config.worktree.lock: No such file or directory`. This looks like a race with concurrent git processes from parallel reviewers in the same checkout. A retry succeeded."
+    }
+  ],
+  "comments_posted_actual": 1,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 7.033504400000002,
+  "duration_ms": 590981,
+  "num_turns": 18,
+  "tokens": {
+    "input": 18,
+    "output": 18926,
+    "cache_read": 377710,
+    "cache_creation": 70933,
+    "total": 467587
+  }
+}
