@@ -1,0 +1,79 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T16:08:56.336Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39143504012",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39143504012",
+  "actor": "AlexisBalayre",
+  "commit_sha": "1815162eede57e03860d3cd60edc7a6d27779f0c",
+  "source": "pr",
+  "pr_number": 42,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "security",
+    "context",
+    "maintainability",
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "824726ed64477594ac57ec2b9849ee752c52dfe9",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1074-1075",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "\"So can any file a hook reads that the sandbox can write.\" is ambiguous. \"So can\" does not say what is being repeated. A reader has to work out that it means \"any such file can also be used to hold the read past the timeout\". Suggested rewording: \"The same holds for any file a hook reads that the sandbox can write.\"",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 0.8861989,
+  "duration_ms": 78671,
+  "num_turns": 9,
+  "tokens": {
+    "input": 12,
+    "output": 5283,
+    "cache_read": 228163,
+    "cache_creation": 36441,
+    "total": 269899
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 26,
+      "output": 8848,
+      "cache_read": 416572,
+      "cache_creation": 73501,
+      "cost_usd": 0.7372063999999999
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 14,
+      "output": 3382,
+      "cache_read": 112795,
+      "cache_creation": 41546,
+      "cost_usd": 0.1489925
+    }
+  ],
+  "permission_denials": []
+}
