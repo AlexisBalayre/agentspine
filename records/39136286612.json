@@ -1,0 +1,197 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T14:35:30.041Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39136286612",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39136286612",
+  "actor": "AlexisBalayre",
+  "commit_sha": "0721fe117b1aff93e1b6a0bb9632a42b600d734f",
+  "source": "pr",
+  "pr_number": 41,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "correctness",
+    "security",
+    "security",
+    "maintainability",
+    "maintainability",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "correctness",
+    "security",
+    "security",
+    "maintainability",
+    "maintainability",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "context",
+    "spec"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "76-79",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`--merged` only counts a worktree as shipped when its tip exactly equals a merged PR's headRefOid. A tip that is an ancestor of the merged head is never cleaned up, and the 'no PR merged into main shipped its tip' message is false for it. This happens when the forge's 'Update branch', an accepted suggestion, or a bot commit landed on the PR before merge.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "37-38",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "When gh is missing, not signed in, or cannot pick a default repo, `--merged` keeps every worktree but exits 0, so an agent reads success from a check that never ran. A failed fetch, the same 'cannot decide' case, exits 1.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "24-27",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "`--merged` is only rejected alongside names when it comes first: `--merged foo` prints usage, but `foo --merged` removes foo and then just prints 'Skipped --merged'.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "42",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The `.worktrees/*/` glob in `--merged` skips dot-named worktrees, yet both scripts' name rule allows a leading '.', so a worktree made with `worktree-create.sh .scratch` is never visited.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "59",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Under set -e, a worktree whose gitdir is gone makes `git -C ... branch --show-current` fail and stops the run. With `--merged`, one stale worktree therefore leaves every later one unprocessed.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "103",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "After the NOW re-check, `git branch -D` deletes the branch unconditionally, leaving a millisecond race if another checkout moves the branch. `git update-ref -d refs/heads/$BRANCH $TIP` would delete only if the ref still equals the checked tip (same pattern at line 112).",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "49",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The worktree-name case pattern is copy-pasted from worktree-create.sh line 16 with no cross-reference. If someone later tightens one copy, create and remove disagree on which names are valid.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "40-117",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Single-name and `--merged` modes share one ~70-line loop: `set --` rewrites the arguments, and the coupled CHECKED/SHIPPED/TIP flags are read at both ends. Splitting it into `is_shipped` and `cleanup_branch` functions would make the next mode easier to add.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/worktree.test.ts",
+      "line": "46",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The `remove()` helper decides whether to stub `gh repo view` by comparing its argument against the NO_GH magic string. A 'gh present but repo view fails' case cannot be expressed, and any other failing stub silently gets the default-branch preamble.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/worktree.test.ts",
+      "line": "285",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The stacked-PR test's gh stub matches the literal substring `--base main`. A harmless respelling of the gh call (`--base=main`, `-B`) would fail it with a confusing 'branch deleted' error instead of exposing a real regression.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "AGENTS.md",
+      "line": "56",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The bullet says `--merged` acts on 'every worktree whose PR merged', but the script only counts PRs merged into the default branch. Consider 'whose PR merged into the default branch' here and in the src/plan.utils.ts template copy.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1000",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Decision 33's cost line says an earlier scaffold's AGENTS.md bullet 'stops naming the script', but that only happens once a re-scaffold rewrites the managed block. As written, it reads as automatic.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 2.7943687,
+  "duration_ms": 229940,
+  "num_turns": 15,
+  "tokens": {
+    "input": 14,
+    "output": 14765,
+    "cache_read": 295913,
+    "cache_creation": 51220,
+    "total": 361912
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 54,
+      "output": 60706,
+      "cache_read": 801711,
+      "cache_creation": 190825,
+      "cost_usd": 2.4824631999999993
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 28,
+      "output": 8363,
+      "cache_read": 245970,
+      "cache_creation": 81449,
+      "cost_usd": 0.3119055
+    }
+  ],
+  "permission_denials": []
+}
