@@ -1,0 +1,129 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T14:05:43.020Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39134195401",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39134195401",
+  "actor": "AlexisBalayre",
+  "commit_sha": "6648297e46b58c29e9bde21c7ceb848a4be4e78e",
+  "source": "pr",
+  "pr_number": 38,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "3fcd691bb0f67b5b1e4843ebc511c6ca6cd58022",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "203",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`# -fn: overlapping entries snapshot the same link twice.` gives the reason for `-f` (replace the link an earlier entry left) but not for `-n` (don't descend into an existing link-to-directory), so `-n` looks removable. Same line in the .github copy.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/github/workflows/claude-code-review.yml",
+      "line": "33-36",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The RESTORE_PATHS header invites adding paths the shared tree resolves through, but doesn't mention the new limit: an entry with a link in a leading component (e.g. `.agents/skills/foo` when `.agents/skills` is a link) now fails the review. One clause would head off a confusing failure. Same in the .github copy.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/review/review-cli.test.ts",
+      "line": "525",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`expect(snapshotDir).toBe(\".claude-pr-agents\")` hard-codes the literal the test claims to derive from the step, so a rename means editing the test too; `toBeDefined()` would keep the SKILL.md guard (the `toContain` line) without the second edit site.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/review/review-cli.test.ts",
+      "line": "521-527",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The SKILL.md-pointer test never runs the restore step; it is a cross-file consistency check and would sit more naturally beside the others in test/workflow-sync.test.ts than in the \"workflow's config restore\" describe block.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.7171939,
+  "duration_ms": 140737,
+  "num_turns": 12,
+  "tokens": {
+    "input": 12,
+    "output": 10562,
+    "cache_read": 230348,
+    "cache_creation": 44898,
+    "total": 285820
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 38,
+      "output": 28723,
+      "cache_read": 523220,
+      "cache_creation": 111864,
+      "cost_usd": 1.37327
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 36,
+      "output": 7978,
+      "cache_read": 317497,
+      "cache_creation": 80229,
+      "cost_usd": 0.3439239
+    }
+  ],
+  "permission_denials": [
+    {
+      "tool": "Bash",
+      "input": "cd /home/runner/work/agentspine/agentspine; git diff 3fcd691bb0f67b5b1e4843ebc511c6ca6cd58022..HEAD -- .github/workflows/claude-code-review.yml; diff <(sed -n '/Restore startup config/,/^      - name:"
+    },
+    {
+      "tool": "Bash",
+      "input": "cd /home/runner/work/agentspine/agentspine; diff .github/workflows/claude-code-review.yml .claude-pr-agents/templates/github/workflows/claude-code-review.yml | head -30; grep -n \"runs-on\\|^  [a-z-]*:$"
+    },
+    {
+      "tool": "Bash",
+      "input": "cd /home/runner/work/agentspine/agentspine; git diff 3fcd691bb0f67b5b1e4843ebc511c6ca6cd58022..HEAD -- test/review/review-cli.test.ts | grep -n \"^+.*//\" ; diff <(sed -n '/Restore startup config/,/^   "
+    },
+    {
+      "tool": "Bash",
+      "input": "grep -n \"RESTORE_PATHS\" .github/workflows/claude-code-review.yml .claude-pr-agents/templates/github/workflows/claude-code-review.yml; diff <(sed -n '/Restore startup config/,/Install the Bash sandbox/"
+    }
+  ]
+}
