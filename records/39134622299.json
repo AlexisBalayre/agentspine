@@ -1,0 +1,115 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T14:12:00.672Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39134622299",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39134622299",
+  "actor": "AlexisBalayre",
+  "commit_sha": "94f1a8bb6c35aff15ca0ce11068de26879b66b03",
+  "source": "pr",
+  "pr_number": 40,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "security",
+    "context",
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "015a3f3d3f0a42b4bf8b131113de4f8c16da9ef8",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [
+    {
+      "file": "README.md",
+      "line": "142-146",
+      "status": "resolved"
+    }
+  ],
+  "findings": [
+    {
+      "file": "README.md",
+      "line": "140-142",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The new upgrade steps say \"delete the workflow, re-run `npx agentspine`\", but `--packs` defaults to none and is never remembered, so that bare command emits neither the workflow nor the `pr-ci-review` skill and leaves the repository with no CI review (CHANGELOG.md:6-8 repeats it).",
+      "body": "**The documented upgrade path removes the CI review rather than upgrading it.**\n\nThe fix replaces \"Re-scaffold to move that pin\" with a literal command: \"delete the workflow, re-run `npx agentspine`\". The scaffolder takes its packs only from the CLI. Nothing on disk records which packs a repository was scaffolded with:\n\n- `parse()` starts at `packs: []` (`src/cli.ts:56`), and only `--packs` changes it (`:80-86`).\n- `resolvePacks` (`src/plan.utils.ts:36-45`) expands the requested list only. It never detects an existing `.agents/skills/pr-ci-review` or a marker.\n- The workflow is emitted only `if (packs.includes(\"ci-review\"))` ([src/plan.utils.ts:292](https://github.com/AlexisBalayre/agentspine/blob/94f1a8bb6c35aff15ca0ce11068de26879b66b03/src/plan.utils.ts#L292-L301)), and pack skills are copied only for requested packs (`:278-284`).\n\nSomeone who follows the README literally deletes `.github/workflows/claude-code-review.yml`, runs `npx agentspine`, gets core content only, and ends up with no review workflow. For the same reason, line 140's \"A re-scaffold updates the `pr-ci-review` skill\" holds only when `--packs ci-review` is passed again.\n\nTwo more snags lie on the corrected path:\n\n- The deletion leaves the tree dirty (`gitState` treats any `git status --porcelain` output as dirty, `src/detect.utils.ts:67-68`), so `init` refuses until it is committed or `--force` is passed (`src/cli.ts:107-110`).\n- Passing `--packs` makes the run non-interactive (`src/cli.ts:64`, `:124`), so it also needs `--yes`, or it exits at \"Refusing to write without confirmation\" (`:161-164`).\n\n`CHANGELOG.md:6-8` gives the same bare command and needs the same fix.\n\n- [README.md#L140-L142](https://github.com/AlexisBalayre/agentspine/blob/94f1a8bb6c35aff15ca0ce11068de26879b66b03/README.md#L140-L142)\n- [CHANGELOG.md#L6-L8](https://github.com/AlexisBalayre/agentspine/blob/94f1a8bb6c35aff15ca0ce11068de26879b66b03/CHANGELOG.md#L6-L8)",
+      "suggestion": "toolchain of its own. Re-running with `--packs ci-review` updates the `pr-ci-review` skill but never\nrewrites an existing workflow, though the skill, the workflow and the tooling move together. To\nupgrade, delete the workflow and commit that, re-run `npx agentspine --packs ci-review --yes` with\nevery other pack you use, then re-apply any edits you had made to it."
+    },
+    {
+      "file": "README.md",
+      "line": "141",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "\"the two move together with the tooling\" is ambiguous: the sentence names the skill, the workflow and the tooling, so a reader can't tell what \"the two\" is. The workflow comment's \"this workflow, the pr-ci-review skill and the poster share a contract\" is clearer.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "524-526",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The decision 23 amendment says only deleting or editing the workflow moves the pin. It leaves out the cost the README and the workflow comment state: a re-scaffold that skips the workflow still updates the skill, so the skill and the pinned tooling can diverge.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": ".claude-pr/ again held only CLAUDE.md, .gitmodules and .claude/. The PR's copies of the RESTORE_PATHS entries (AGENTS.md, .agents, templates) were missing, so reviewers read them with `git show HEAD:<path>`. One conventions note relied on the in-tree base copy of templates/ for the pin and did not read the head."
+    },
+    {
+      "component": "orchestrator",
+      "description": "Skipped security and context: in this delta the workflow template changes only a comment, and the rest is docs plus a test helper, so no trust boundary or protocol surface changed. Skipped spec: there is no closing keyword or linked issue."
+    }
+  ],
+  "comments_posted_actual": 1,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.5014413,
+  "duration_ms": 154813,
+  "num_turns": 12,
+  "tokens": {
+    "input": 16,
+    "output": 9550,
+    "cache_read": 366372,
+    "cache_creation": 47017,
+    "total": 422955
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 44,
+      "output": 19008,
+      "cache_read": 743169,
+      "cache_creation": 119851,
+      "cost_usd": 1.2692757999999997
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 26,
+      "output": 5723,
+      "cache_read": 238960,
+      "cache_creation": 60395,
+      "cost_usd": 0.23216550000000002
+    }
+  ],
+  "permission_denials": []
+}
