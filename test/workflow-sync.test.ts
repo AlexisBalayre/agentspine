@@ -44,6 +44,15 @@ describe("the emitted review workflow", () => {
     // A push by someone else to a trusted author's branch fires synchronize too.
     expect(template).toContain("github.actor == github.event.pull_request.user.login");
   });
+
+  it("points reviewers at the directory the restore step snapshots into", () => {
+    const template = readFileSync(path.resolve("templates/github/workflows/claude-code-review.yml"), "utf8");
+    const step = template.split("- name: Restore startup config from base")[1]?.split(/\n\s+- name: /)[0] ?? "";
+    const snapshotDir = /^\s+mkdir (\S+)$/m.exec(step)?.[1];
+    const skill = readFileSync(path.resolve("templates/agents/skills/pr-ci-review/SKILL.md"), "utf8");
+    expect(snapshotDir).toBeDefined();
+    expect(skill).toContain(`Read ${snapshotDir}/<path>`);
+  });
 });
 
 /** The permissions block of one job, as written in the workflow. */

@@ -518,11 +518,4 @@ describe("the workflow's config restore", () => {
     expect(result.status).not.toBe(0);
     expect(readdirSync(path.join(outside, "agents"))).toEqual(["keep.txt"]);
   });
-
-  it("points reviewers at the directory the step snapshots into", () => {
-    const snapshotDir = /^mkdir (\S+)$/m.exec(workflowStep("Restore startup config from base"))?.[1];
-    const skill = readFileSync(path.resolve("templates/agents/skills/pr-ci-review/SKILL.md"), "utf8");
-    expect(snapshotDir).toBe(".claude-pr-agents");
-    expect(skill).toContain(`Read ${snapshotDir}/<path>`);
-  });
 });

@@ -32,7 +32,8 @@ env:
   # Config the model executes at startup, restored from the base branch below so a PR cannot
   # rewrite the reviewer that reviews it. Add any path the shared tree resolves through: if
   # `.agents/skills` is a symlink into another directory, that directory belongs here too,
-  # because restoring the link does not restore what it points at.
+  # because restoring the link does not restore what it points at. Name that directory, not a
+  # path through the link: an entry with a link in a leading component fails the review.
   RESTORE_PATHS: "AGENTS.md .agents"
 
 jobs:
@@ -200,7 +201,8 @@ jobs:
               dest=".claude-pr-agents/${entry#*$'\t'}"
               mkdir -p "$(dirname "$dest")"
               # A gitlink (160000) names a commit, not a blob, so it has nothing to snapshot.
-              # -fn: overlapping entries snapshot the same link twice.
+              # -f: an overlapping entry already snapshotted this link. -n: replace that link
+              # rather than follow it into the directory it names.
               case "$mode" in
                 120000) ln -sfn -- "$(git cat-file blob "$oid")" "$dest" ;;
                 100644 | 100755) git cat-file blob "$oid" > "$dest" ;;
