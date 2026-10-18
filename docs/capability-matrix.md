@@ -36,6 +36,13 @@ Two consequences the design absorbs:
   stdout, and stdout is reserved for that JSON. Its adapter translates, and keeps every other byte
   on stderr. This is exactly why policies never speak a host's protocol directly.
 
+**A Claude Code hook that fails or times out lets the call through.** A `PreToolUse` command hook
+that reaches its `timeout` is cancelled and does not block the tool call, and on most events a
+failing hook does not stop the action either. `"onFailure": "block"`, from 2.1.295, makes both
+block (https://code.claude.com/docs/en/hooks, "Timeouts" and "Block the action when a hook fails",
+read 2026-10-18). agentspine sets `timeout: 5` on git-safety and leaves `onFailure` unset, since its
+adapters fail open (decision 12).
+
 ## The two findings the design rests on
 
 1. **`SKILL.md` is a de facto standard.** All five follow the Anthropic Agent Skills spec: `name`

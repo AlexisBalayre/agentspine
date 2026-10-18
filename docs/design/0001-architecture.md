@@ -1059,13 +1059,18 @@ takes the value on the last `GIT_TRUNK=` line, with or without `export`: up to t
 when the value is quoted, up to the first whitespace when it is not. Nothing else in the file
 runs, and a file it cannot read leaves the trunk at `main` rather than ending the policy, which
 would turn off every rule. Only the first 64 KiB is read: Claude Code lets the call through when a
-`PreToolUse` hook outlasts its timeout (hooks reference, "Timeouts", read 2026-10-18), which is 5
-seconds here, and the unbounded read took 8 seconds on a sparse 1 GiB `.env` on macOS.
+`PreToolUse` hook outlasts its timeout (capability matrix, "Hook interfaces"), 5 seconds here, and
+the unbounded read took 8 seconds on a sparse 1 GiB `.env` on macOS.
 
 - **Rejected:** denying `./.env` as well. It is per-machine config that the `wizard` skill and
   the project's own tooling write.
 - **Cost accepted:** a sandboxed command can still change which branch git-safety guards, by
   writing `GIT_TRUNK` into `.env` or making the file unreadable.
 - **Cost accepted:** a `.env` that sets `GIT_TRUNK` with shell syntax, such as
-  `GIT_TRUNK=$DEFAULT_BRANCH`, now hands git-safety that text, not its value, and a `GIT_TRUNK`
-  line past the first 64 KiB is not read.
+  `GIT_TRUNK=$DEFAULT_BRANCH`, now hands git-safety that text, not its value. A `GIT_TRUNK` line
+  past the first 64 KiB is not read, and one that crosses that byte is cut short there.
+- **Cost accepted:** a sandboxed process can still hold the read of `.env` past the hook's
+  timeout, with a Linux write lease on the file or a FIFO put in its place after the `-f` test,
+  and Claude Code then lets the call through. So can any file a hook reads that the sandbox can
+  write. `"onFailure": "block"` would close it, but makes every failing or timed-out hook block the
+  call, against the adapters' rule of failing open (decision 12).
