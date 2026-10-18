@@ -137,13 +137,15 @@ the run.
 
 The workflow's deterministic steps are `agentspine review preflight|schema|post|metrics`, installed
 from npm at the version that scaffolded the file, so the repository gets a workflow and no
-toolchain of its own. Re-scaffold to move that pin.
+toolchain of its own. A re-scaffold updates the `pr-ci-review` skill but never rewrites an existing
+workflow, and the two move together with the tooling. To upgrade, delete the workflow, re-run
+`npx agentspine`, then re-apply any edits you had made to it.
 
 The `anthropics/claude-code-action` pin also fixes which Claude Code runs the review, since the
-action bundles it: v1.0.251, Claude Code 2.1.301. A re-scaffold moves it too. To follow Claude Code
-between re-scaffolds, let Dependabot bump the workflow's actions. It changes the action pins only,
-never the tooling version, and its pull requests get no review, because its author is none of
-the associations below:
+action bundles it; the [capability matrix](docs/capability-matrix.md#the-ci-reviews-lock-claude-code)
+records which version. To follow Claude Code releases, let Dependabot bump the workflow's actions.
+It changes the action pins only, never the tooling version, and its pull requests get no review,
+because its author is none of the associations below:
 
 ```yaml
 # .github/dependabot.yml

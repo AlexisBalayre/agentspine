@@ -46,6 +46,11 @@ describe("the emitted review workflow", () => {
   });
 });
 
+const BOTH_COPIES = [
+  ["the emitted template", "templates/github/workflows/claude-code-review.yml"],
+  ["this repo's copy", ".github/workflows/claude-code-review.yml"],
+] as const;
+
 /** The permissions block of one job, as written in the workflow. */
 function jobPermissions(workflow: string, job: string): string {
   const body = workflow.split(`\n  ${job}:\n`)[1] ?? "";
@@ -53,10 +58,7 @@ function jobPermissions(workflow: string, job: string): string {
   return block?.[1] ?? "";
 }
 
-describe.each([
-  ["the emitted template", "templates/github/workflows/claude-code-review.yml"],
-  ["this repo's copy", ".github/workflows/claude-code-review.yml"],
-])("%s keeps the model away from a write token", (_label, file) => {
+describe.each(BOTH_COPIES)("%s keeps the model away from a write token", (_label, file) => {
   const workflow = readFileSync(path.resolve(file), "utf8");
 
   // The whole point of the split: a review talked into writing to the PR has no token that can.
@@ -77,19 +79,34 @@ describe.each([
   });
 });
 
-describe.each([
-  ["the emitted template", "templates/github/workflows/claude-code-review.yml"],
-  ["this repo's copy", ".github/workflows/claude-code-review.yml"],
-])("%s caches nothing from the checkout", (_label, file) => {
+/** The lines of each setup-node step after its `uses:`, comments left out. */
+function setupNodeSteps(workflow: string): string[] {
+  const lines = workflow.split("\n");
+  return lines.flatMap((line, i) => {
+    const uses = /^( *)(- )?uses: actions\/setup-node@/.exec(line);
+    if (!uses) return [];
+    // A step's keys share this column, so a line indented less ends the step.
+    const column = uses[1].length + (uses[2]?.length ?? 0);
+    const body: string[] = [];
+    for (const next of lines.slice(i + 1)) {
+      if (next.trim() === "" || next.trimStart().startsWith("#")) continue;
+      if (next.length - next.trimStart().length < column) break;
+      body.push(next);
+    }
+    return [body.join("\n")];
+  });
+}
+
+describe.each(BOTH_COPIES)("%s caches nothing from the checkout", (_label, file) => {
   const workflow = readFileSync(path.resolve(file), "utf8");
 
   // setup-node caches on its own when the checkout's package.json names npm, and the checkout is
   // the user's repository. The jobs install nothing from its lockfile, so the cache is only risk.
-  it("turns off setup-node's automatic cache in every job", () => {
-    const steps = workflow.split("uses: actions/setup-node@").slice(1);
+  it("turns off setup-node's automatic cache in every setup-node step", () => {
+    const steps = setupNodeSteps(workflow);
     expect(steps.length).toBeGreaterThan(0);
     for (const step of steps) {
-      expect(step.split(/\n\s+- /)[0]).toContain("package-manager-cache: false");
+      expect(step).toMatch(/^\s+package-manager-cache: false$/m);
     }
   });
 });
@@ -100,10 +117,7 @@ function managedSettings(workflow: string) {
   return JSON.parse(heredoc.replace(/^ {10}/gm, ""));
 }
 
-describe.each([
-  ["the emitted template", "templates/github/workflows/claude-code-review.yml"],
-  ["this repo's copy", ".github/workflows/claude-code-review.yml"],
-])("%s holds the model to what a review needs", (_label, file) => {
+describe.each(BOTH_COPIES)("%s holds the model to what a review needs", (_label, file) => {
   const workflow = readFileSync(path.resolve(file), "utf8");
   const settings = managedSettings(workflow);
 

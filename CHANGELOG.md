@@ -3,8 +3,9 @@
 Notable changes to what `agentspine` ships. Changes to this repository that never reach a
 scaffolded tree — CI gates, contributor tooling, the design record — are not listed here.
 
-The emitted CI review workflow pins the version that scaffolded it, so upgrading a scaffolded
-repository means re-running `npx agentspine`.
+The emitted CI review workflow pins the version that scaffolded it, and a re-scaffold never
+rewrites an existing workflow, so upgrading a scaffolded repository means deleting that workflow,
+then re-running `npx agentspine`.
 
 ## Unreleased
 
@@ -66,8 +67,8 @@ repository means re-running `npx agentspine`.
   replaces the old link. An edit under `.agents/agents/` no longer reaches Claude Code.
 - The review record carries `reviewers_returned`, and the metrics record `incomplete_reason`; the
   metrics `schema_version` is now 2. The workflow, the `pr-ci-review` skill and the tooling move
-  together, so re-scaffold rather than bumping the workflow's pin by hand: the new tooling rejects
-  a record from the old skill as not reviewed.
+  together, so delete the workflow and re-scaffold rather than bumping its pin by hand: the new
+  tooling rejects a record from the old skill as not reviewed.
 
 ### Removed
 

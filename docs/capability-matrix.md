@@ -150,9 +150,10 @@ copy and not the shared files (decision 28).
 
 Read 2026-10-18, from Claude Code's documentation. The emitted review workflow writes these into
 `/etc/claude-code/managed-settings.json`, the managed settings path on Linux (decision 31). The run
-uses the Claude Code that `claude-code-action` v1.0.251 bundles, 2.1.301 (its `bun.lock` pins
-`@anthropic-ai/claude-agent-sdk` 0.3.301, whose `claudeCodeVersion` is 2.1.301). Dependabot moves
-this repository's pin (decision 32); 2.1.301 is the version these facts were checked against.
+uses the Claude Code that `claude-code-action` v1.0.251 bundles, 2.1.301: its `bun.lock:40` at
+`374f254` pins `@anthropic-ai/claude-agent-sdk` 0.3.301, whose published `package.json` gives
+`claudeCodeVersion` 2.1.301. Dependabot moves this repository's pin (decision 32); 2.1.301 is
+the version these facts were checked against.
 
 | Setting or fact | What the docs say it does |
 | :-- | :-- |
@@ -187,8 +188,8 @@ this repository's pin (decision 32); 2.1.301 is the version these facts were che
 
 Read 2026-10-18. The emitted review workflow's comments cite these.
 
-- **claude-code-action runs agent mode here, which sets no permission mode.** At v1.0.237
-  (`fd1c128`), a `prompt` input selects agent mode on a comment event and on a pull request's
+- **claude-code-action runs agent mode here, which sets no permission mode.** At v1.0.251
+  (`374f254`), a `prompt` input selects agent mode on a comment event and on a pull request's
   `opened`, `synchronize`, `ready_for_review` and `reopened` (`src/modes/detector.ts:41-42` and
   `:73-74`), unless `track_progress` is set, which forces tag mode (`:20-31`). Agent mode passes
   the workflow's `claude_args` after its own `--mcp-config` and nothing else

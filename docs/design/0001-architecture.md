@@ -521,6 +521,9 @@ that installs `agentspine@<version>` to run its own review tooling, so until age
 published, that pack shipped a red step. The pin is written at scaffold time, which makes the CI contract
 between the workflow, the `pr-ci-review` skill and the poster immovable until someone re-scaffolds.
 
+Amended by decision 32: a re-scaffold skips a workflow that already exists, so it does not move the
+pin. Only deleting the workflow first, or editing it by hand, does.
+
 Published as `0.1.0` rather than `1.0.0`: the flag set is a public API from here (decision 10), the
 CI record's `schema_version` is its own contract, and three of the five tools are still wired from
 their documentation rather than from a run anyone has watched (Codex, opencode and Cursor; the
@@ -932,13 +935,15 @@ given (`github_actions/lib/dependabot/github_actions/file_fetcher.rb:166-180`, d
 - **Cost accepted:** the review is owner-only and skips Dependabot's pull requests, as the
   template's does. The first review after merging a bump is that bump's real test.
 
-**The pack emits no `dependabot.yml`.** A scaffolded repository keeps its pin until it re-scaffolds,
-and the README gives the snippet that moves it daily instead.
+**The pack emits no `dependabot.yml`.** The README gives the snippet that moves the action pins
+daily instead. Decision 23 assumed a re-scaffold moves the pins too, but the scaffolder skips a
+workflow that already exists (`src/plan.utils.ts`, "already present; never overwritten"). A pin
+moves only when someone edits the workflow, or deletes it and re-scaffolds; the README says so.
 
 - **Rejected:** writing one with `ci-review`. The file may already exist in the user's `.github/`,
   and a daily stream of pull requests is that repository's policy to choose.
-- **Cost accepted:** a repository that does neither reviews on the Claude Code it was scaffolded
-  with.
+- **Cost accepted:** a repository that neither adds the snippet nor touches the workflow reviews
+  on the Claude Code it was scaffolded with.
 
 **The bumps.** `claude-code-action` v1.0.251 (its `bun.lock` pins the agent SDK at 0.3.301, which
 is Claude Code 2.1.301), `checkout` v7, `setup-node` v7, `upload-artifact` v7 and
