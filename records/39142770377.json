@@ -1,0 +1,141 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T16:01:46.638Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39142770377",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39142770377",
+  "actor": "AlexisBalayre",
+  "commit_sha": "824726ed64477594ac57ec2b9849ee752c52dfe9",
+  "source": "pr",
+  "pr_number": 42,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "conventions",
+    "docs",
+    "maintainability"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "conventions",
+    "docs",
+    "maintainability"
+  ],
+  "reviewers_skipped": [
+    "context",
+    "spec"
+  ],
+  "review_mode": "incremental",
+  "incremental_from_sha": "e46afa99853da21511a8fcf46875394ce3642225",
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "491-509",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new test probably does not fail against the old policy in CI. The 8 s figure for the old unbounded read was measured with BSD sed on macOS, but CI runs only on `ubuntu-latest` (`.github/workflows/ci.yml:12,20`). There, GNU sed reads a sparse 1 GiB file of NULs as one line and fails the anchored `^...GIT_TRUNK=` match quickly, so the old policy likely finishes well under 5 s and the test passes with or without `head -c`. A check that only the first 64 KiB is read (for example, a `GIT_TRUNK=develop` line placed just past byte 65536 is ignored) would guard the bound on every platform.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "16",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "`head -c 65536` ends mid-line, and sed still processes the unterminated last line. In a `.env` over 64 KiB whose `GIT_TRUNK=develop` line crosses byte 65536, the trunk becomes something like `dev`, so git-safety silently guards a branch that does not exist. Decision 34 only says such a line \"is not read\". Either drop the last line when the file was truncated (it has no trailing newline), or document the truncated-value case in decision 34.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1060-1062",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new Claude Code fact, that a `PreToolUse` hook outlasting its timeout lets the call through (hooks reference, \"Timeouts\", read 2026-10-18), is recorded only in decision 34. AGENTS.md says facts about the five tools come from their docs \"with the source and date recorded in the matrix\", and `docs/capability-matrix.md` has no timeout entry. Add it to the matrix's hook interfaces section and point the ADR at it, as decision 34 already does for other Claude Code facts.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "11-14",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The comment joins two clauses: \"since a hook that times out lets the command run, and one it cannot read leaves the trunk at main\". The nearest noun is \"a hook\", so \"one it cannot read\" first parses as a hook, while it means a `.env`. Name the subject: \"...lets the command run; a .env it cannot read leaves the trunk at main rather than ending the policy, which would turn off every rule below.\"",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "496-506",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The new test inlines the same `spawnSync(\"bash\", [ADAPTER, \"git-safety\"], ...)` call the describe's `commit(root)` helper (lines 444-454) already makes, differing only by `timeout: 5000`. Giving `commit` an optional timeout parameter removes about 12 duplicated lines; `spawnSync` ignores `timeout: undefined`, so other callers are unaffected.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/claude-code-adapter.test.ts",
+      "line": "505",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`timeout: 5000` is a wall-clock bound that also covers bash, git and adapter startup, so a loaded CI runner could trip it; `spawnSync` then returns `status: null` and `toBe(2)` fails with no hint that a timeout was the cause. A named constant tied to the hook timeout, or a looser bound (the regression it guards takes seconds), would make a failure clearer.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/hooks/policies/git-safety.sh",
+      "line": "15-16",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "`head -c 65536` caps how many bytes are read, not how long the open of `.env` can block. A background sandboxed process can still stall the open past the 5-second hook timeout: on Linux by holding a write lease (`fcntl(F_SETLEASE, F_WRLCK)` on the `.env` it owns; `[ -f ]` only stats, so it does not break the lease, and the kernel forces it only after 45 s), or by racing a FIFO over `.env` between `[ -f ]` and the open. A timed-out hook lets the call through, which skips every rule, force-push and hard-reset included. The sed read at e46afa9 and the sourcing on main blocked the same way, so this delta does not introduce the hang. But decision 34's Cost accepted list names only retargeting or an unreadable `.env`, which leave those rules running. Consider recording the stalled-open case there, or putting a deadline on the read.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.8755445000000002,
+  "duration_ms": 225552,
+  "num_turns": 12,
+  "tokens": {
+    "input": 10,
+    "output": 10913,
+    "cache_read": 209444,
+    "cache_creation": 51761,
+    "total": 272128
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 40,
+      "output": 33676,
+      "cache_read": 562180,
+      "cache_creation": 144324,
+      "cost_usd": 1.6630190000000002
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 22,
+      "output": 5151,
+      "cache_read": 183765,
+      "cache_creation": 57038,
+      "cost_usd": 0.2125255
+    }
+  ],
+  "permission_denials": []
+}
