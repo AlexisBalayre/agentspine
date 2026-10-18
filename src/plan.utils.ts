@@ -91,7 +91,8 @@ rather than repeating it.
   than assuming a layout.
 - The quality gate reads \`.agents/quality.toml\`.
 - Work on a change in its own worktree: \`.agents/scripts/worktree-create.sh <name>\`, configured by
-  \`.agents/worktree.env\`. \`.agents/scripts/worktree-clean.sh\` removes those whose branch merged.
+  \`.agents/worktree.env\`. \`.agents/scripts/worktree-remove.sh <name>\` removes one, and its branch
+  once no work is lost; \`.agents/scripts/worktree-clean.sh\` force-removes those whose branch merged.
 - Hook policies are shared shell scripts; each tool has a thin adapter in
   \`.agents/hooks/adapters/\`. The contract is \`.agents/hooks/CONTRACT.md\`.
 
@@ -99,11 +100,11 @@ Managed by agentspine. Edit outside the markers, or edit \`.agents/\` directly.`
 
 const CLAUDE_BODY = "@AGENTS.md";
 
-const WORKTREE_ENV = `# Read by .agents/scripts/worktree-create.sh and worktree-clean.sh. Sourced as shell.
+const WORKTREE_ENV = `# Read by the worktree scripts in .agents/scripts/. Sourced as shell.
 #
 # WORKTREE_INSTALL        run inside each new worktree, which starts with no dependencies
 #                         installed; empty skips it. A failing command fails the create.
-# WORKTREE_BRANCH_PREFIX  new branches are <prefix>/<name>; clean only touches this prefix
+# WORKTREE_BRANCH_PREFIX  new branches are <prefix>/<name>; remove and clean only touch this prefix
 
 WORKTREE_INSTALL=""
 WORKTREE_BRANCH_PREFIX="feature"

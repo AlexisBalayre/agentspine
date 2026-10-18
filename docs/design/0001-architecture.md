@@ -780,3 +780,39 @@ runs `review-changes` locally instead and fixes that review's important findings
 
 **Not taken in here:** the template's worktree-removal script and its review-pipeline changes.
 Each is its own port.
+
+## 30. Removing a worktree without losing its branch
+
+Date: 2026-10-18
+
+The template now ships the reverse of `worktree-create.sh`, and it comes into core beside the other
+two as `.agents/scripts/worktree-remove.sh <name>...`. `worktree-clean.sh` answers a different
+question: it sweeps every prefixed worktree whose remote branch is gone and removes it with
+`--force`, uncommitted files included. Remove takes names, never forces, and deletes a branch only
+when no commit is lost:
+
+- A worktree with uncommitted or untracked files, or on a detached HEAD, is kept. Ignored files go
+  with it.
+- Only `<prefix>/` branches are touched, and the tip is read from `refs/heads/`, so a same-named
+  tag cannot stand in for it. The branch goes once a merged pull request shipped that tip (a squash
+  merge leaves it off the trunk, so only the forge can say) or once origin's copy holds every
+  commit.
+- Origin's copy is deleted only on the merged-PR path, under a lease on the merged tip, so origin
+  refuses the delete if the branch moved after the fetch. A failed fetch keeps every branch: a
+  stale remote-tracking ref could vouch for commits the remote no longer has.
+
+Each rule has a test that was watched failing with the rule broken. The lease's test moves
+origin's branch from inside the stubbed `gh` lookup, which runs between the fetch and the delete.
+
+- **Config from `.agents/worktree.env`**, as for the other two, instead of the template's
+  `.claude/project.env`.
+- **`gh` is optional.** The template's repository always has it; a scaffolded one may not, or may
+  not be on GitHub. When `gh` gives no answer, the merged-PR check vouches for nothing, origin's
+  copy is the only evidence, and the message says `gh` could not tell rather than that no PR
+  shipped the branch.
+
+- **Cost accepted:** "did this ship" is a question for GitHub. In a repository without a working
+  `gh`, or on another forge, a squash-merged branch is kept until someone deletes it by hand. That
+  costs a `git branch -D` and loses nothing.
+- **Cost accepted:** three worktree scripts where two used to cover the job. The `AGENTS.md`
+  bullet now says clean force-removes, so the difference is visible where an agent picks one.
