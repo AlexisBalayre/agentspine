@@ -1,0 +1,194 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T12:14:19.116Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39126156707",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39126156707",
+  "actor": "AlexisBalayre",
+  "commit_sha": "3cfdbcd7377d553a41773cea833ad8f5c725a7d3",
+  "source": "pr",
+  "pr_number": 35,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "11-12, 26-29",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Run from inside a worktree, `git rev-parse --show-toplevel` returns that worktree, not the main checkout. The script then prints \"Skipped <name>: no worktree at .worktrees/<name>\" while the worktree exists, and exits 0. An agent cleaning up its own worktree from its own cwd is a likely caller, and since kept or skipped names also exit 0, `worktree-remove.sh x && ...` cannot tell a no-op from a removal. Exit 0 on a kept dirty worktree is deliberate (the test at lines 164-165 asserts it); the wrong root is the real flaw, and the same pattern already exists in create and clean. One fix is to take ROOT from `git rev-parse --path-format=absolute --git-common-dir` and use its parent directory.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "62",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`--delete \"$BRANCH\"` uses the short name. If origin also has a tag with that name, git refuses the push (\"dst refspec matches more than one\"), so origin's branch is kept even though the lease and decision 30 aim at `refs/heads/` and same-named tags.",
+      "body": null,
+      "suggestion": "      git push --quiet --force-with-lease=\"refs/heads/$BRANCH:$TIP\" origin --delete \"refs/heads/$BRANCH\" ||"
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "58-70",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "When the local tip is behind the merged PR's head, the branch is kept and the message wrongly says no merged PR shipped it. This happens when someone adds a commit on GitHub (a committed review suggestion or \"Update branch\") before a squash merge that auto-deletes the branch.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/worktree.test.ts",
+      "line": "208-233",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "No test covers the merged-PR path when origin no longer holds the branch (forge auto-deleted the head branch, so REMOTE_TIP is empty); in both 'squashed' and 'moved' the local delete is also vouched for by origin holding the tip, so a regression making the local `git branch -D` depend on origin's copy would pass all 11 tests",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "scripts/verify-package.sh",
+      "line": "87-88",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The remove step sends stderr to /dev/null as well as stdout (the create step above only hides stdout), so if it fails in CI the log shows only 'failed to run' with no git error; the comment also says the branch is kept but nothing asserts it",
+      "body": null,
+      "suggestion": "(cd \"$REPO\" && ./.agents/scripts/worktree-remove.sh smoke >/dev/null) \\"
+    },
+    {
+      "file": "src/plan.utils.ts",
+      "line": "107",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The worktree.env comment 'remove and clean only touch this prefix' is wrong for remove: worktree-remove.sh removes the worktree whatever its branch and only limits branch deletion to the prefix (the 'never deletes a branch outside the configured prefix' test expects `.worktrees/spike` on `spike/other` to be removed)",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "42-43",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Comment says the merged-PR question \"goes unasked\" without a working gh, but the script does ask and gets no answer. The ADR says \"gh could not tell\" while the script message says \"gh could not say\".",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "4-7",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Header does not say that a failed fetch keeps every branch, which the code treats as a headline rule. The ADR and CHANGELOG both state it, and the code comment covers only the why.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "780-781",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Decision 29's \"Not taken in here: the template's worktree-removal script\" is now outdated, because decision 30 takes that script in. It could point forward to 30.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "49-73",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The branch-decision chain tracks gh state in the `CHECKED` and `MERGED_TIPS` pair, and `git branch -D \"$BRANCH\"` appears in two arms. Whether a branch is safe to delete is spread over three conditions, so the next rule has to be threaded through all of them.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "10-16",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The `cd \"$ROOT\"`, `worktree.env` sourcing and `PREFIX` default block is now copied verbatim into a third script, so a change to the config contract must be made in three places.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/worktree.test.ts",
+      "line": "40-56",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new `remove()` helper re-implements `run()`'s spawnSync call and its `{status, stdout, stderr}` projection, differing only in the PATH stub. A change to the result shape would have to be made twice.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/scripts/worktree-remove.sh",
+      "line": "56",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`--head` matches the head branch name only, with no owner filter, so a merged fork PR whose branch has the same name is also returned.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "The workflow's restore step should have copied the PR's versions of RESTORE_PATHS (AGENTS.md, .agents, templates) into .claude-pr/, but .claude-pr/ held only CLAUDE.md and .claude/. Reviewers read the PR's copies with `git show HEAD:<path>` instead, so coverage was not lost."
+    },
+    {
+      "component": "orchestrator",
+      "description": "The diff is 9 files across several top-level areas, which passes the size gate. Only correctness was scaled to 2 instances: one on the script, one on tests and wiring. Security and maintainability ran as a single instance each, because the logic is all in one 74-line script."
+    },
+    {
+      "component": "conventions",
+      "description": "The conventions reviewer did not open test/worktree.test.ts, so it did not check plan tests or snapshots for hard-coded script lists. The second correctness instance did confirm that the init test covers all three scripts' exec bits."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 2.2521351000000003,
+  "duration_ms": 220302,
+  "num_turns": 14,
+  "tokens": {
+    "input": 14,
+    "output": 12321,
+    "cache_read": 227156,
+    "cache_creation": 57945,
+    "total": 297436
+  }
+}
