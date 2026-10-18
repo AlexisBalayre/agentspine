@@ -84,8 +84,10 @@ step "Creating a worktree with the emitted script"
 # The repository has no origin, so the fetch fails and the branch is kept: offline, the clean
 # worktree is still the one thing it removes.
 step "Removing it with the emitted script"
-(cd "$REPO" && ./.agents/scripts/worktree-remove.sh smoke >/dev/null 2>&1) \
+(cd "$REPO" && ./.agents/scripts/worktree-remove.sh smoke >/dev/null) \
   || die "the emitted worktree-remove.sh failed to run."
 [ ! -d "$REPO/.worktrees/smoke" ] || die "worktree-remove.sh left a clean worktree in place."
+git -C "$REPO" rev-parse -q --verify refs/heads/feature/smoke >/dev/null \
+  || die "worktree-remove.sh deleted a branch it could not vouch for."
 
 printf '\nagentspine %s verified from the packed tarball.\n' "$EXPECTED_VERSION"

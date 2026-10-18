@@ -808,7 +808,7 @@ origin's branch from inside the stubbed `gh` lookup, which runs between the fetc
   `.claude/project.env`.
 - **`gh` is optional.** The template's repository always has it; a scaffolded one may not, or may
   not be on GitHub. When `gh` gives no answer, the merged-PR check vouches for nothing, origin's
-  copy is the only evidence, and the message says `gh` could not tell rather than that no PR
+  copy is the only evidence, and the message says `gh` could not say rather than that no PR
   shipped the branch.
 
 - **Cost accepted:** "did this ship" is a question for GitHub. In a repository without a working

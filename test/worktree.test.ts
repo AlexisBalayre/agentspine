@@ -217,6 +217,30 @@ describe("worktree-remove", () => {
     expect(originHas(repo, "feature/squashed")).toBe(false);
   });
 
+  // A forge set to delete head branches on merge leaves origin no copy, so only the PR vouches.
+  it("deletes a merged branch whose copy the forge already removed from origin", () => {
+    const repo = repoWithOrigin();
+    git(repo, "push", "-q", "origin", "main");
+    const { tip } = worktreeWithCommit(repo, "autodeleted");
+    git(repo, "push", "-q", "origin", "feature/autodeleted");
+    git(repo, "push", "-q", "origin", "--delete", "feature/autodeleted");
+
+    const { status, stderr } = remove(repo, `echo ${tip}`, "autodeleted");
+    expect(status, stderr).toBe(0);
+    expect(hasBranch(repo, "feature/autodeleted")).toBe(false);
+  });
+
+  // A short name would match the tag too, and git refuses a push whose destination is ambiguous.
+  it("deletes origin's copy when a tag there shares the branch's name", () => {
+    const repo = repoWithOrigin();
+    git(repo, "push", "-q", "origin", "main");
+    const { tip } = worktreeWithCommit(repo, "tagged");
+    git(repo, "push", "-q", "origin", "feature/tagged", `${tip}:refs/tags/feature/tagged`);
+
+    const { stderr } = remove(repo, `echo ${tip}`, "tagged");
+    expect(originHas(repo, "feature/tagged"), stderr).toBe(false);
+  });
+
   it("keeps origin's copy when it moved past the merged tip", () => {
     const repo = repoWithOrigin();
     git(repo, "push", "-q", "origin", "main");

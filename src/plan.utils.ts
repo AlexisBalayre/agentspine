@@ -104,7 +104,7 @@ const WORKTREE_ENV = `# Read by the worktree scripts in .agents/scripts/. Source
 #
 # WORKTREE_INSTALL        run inside each new worktree, which starts with no dependencies
 #                         installed; empty skips it. A failing command fails the create.
-# WORKTREE_BRANCH_PREFIX  new branches are <prefix>/<name>; remove and clean only touch this prefix
+# WORKTREE_BRANCH_PREFIX  new branches are <prefix>/<name>; remove and clean delete no other branch
 
 WORKTREE_INSTALL=""
 WORKTREE_BRANCH_PREFIX="feature"
