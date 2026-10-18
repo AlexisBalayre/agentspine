@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T13:26:25.221Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39131224676",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39131224676",
+  "actor": "AlexisBalayre",
+  "commit_sha": "75faecf03c3a603f0f33ff89bd9eed4cb399cf70",
+  "source": "pr",
+  "pr_number": 37,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "maintainability",
+    "conventions",
+    "docs",
+    "context"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "maintainability",
+    "conventions",
+    "docs",
+    "context"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "incremental",
+  "incremental_from_sha": "afaaddb4badc080e83f88b47ffa50b397dbf06a3",
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "README.md",
+      "line": "163-167",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The README says a partial review leaves the `claude-review` status to the last complete one, but `post.script.ts` (L205-209) now sets `failure` when a partial pass dies. That red then stays on the SHA until a full review or a push, because a later partial pass sets nothing. CHANGELOG (\"unless it fails\") and the ADR (\"one that dies still fails it\") say so, the README does not. Add the case and how to clear it.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "README.md",
+      "line": "167",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The added clause pushes line 167 to about 150 columns in a paragraph wrapped near 100. Rewrap after \"leaves it unset),\" so `👎 (important findings posted), or 😕 (...)` starts a new line.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/review/review-body-utils.test.ts",
+      "line": "75-83",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The tilde and raw-pre suggestions contain no backticks, so their inert fence is 3 backticks. That fence cannot close the body's open 4-backtick fence, so those two cases never reach the \"fence closed early\" path the test name describes. They still catch a dropped `inertFences`. Open the body with a 3-backtick fence (or size it per case) so every row runs the real attack.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "As in the prior two rounds, `.claude-pr/` held only `.claude`, `.gitmodules` and `CLAUDE.md`. It had no `AGENTS.md`, `.agents` or `templates`, even though RESTORE_PATHS names them, so reviewers were told to read the PR's copies with `git show HEAD:<path>` instead."
+    },
+    {
+      "component": "docs",
+      "description": "The docs reviewer had a `git show | grep` pipe refused and fell back to separate calls. The review itself was not degraded."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 1.8780104000000002,
+  "duration_ms": 198664,
+  "num_turns": 12,
+  "tokens": {
+    "input": 12,
+    "output": 9912,
+    "cache_read": 235074,
+    "cache_creation": 46171,
+    "total": 291169
+  }
+}
