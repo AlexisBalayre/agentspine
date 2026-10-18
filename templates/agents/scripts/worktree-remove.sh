@@ -4,7 +4,8 @@
 # A worktree with uncommitted or untracked files, or a detached HEAD, is kept; ignored files
 # (.env, node_modules) go with it. Its <prefix>/ branch is deleted once a merged pull request
 # shipped its tip (and origin's copy too, while still at that tip), or once origin's copy holds
-# every commit; otherwise it is kept. The merged-PR check needs an authenticated `gh`.
+# every commit; otherwise it is kept. A failed fetch keeps every branch. The merged-PR check
+# needs an authenticated `gh`.
 # Branch prefix comes from .agents/worktree.env (default: feature).
 set -euo pipefail
 
@@ -49,7 +50,7 @@ for NAME in "$@"; do
   TIP=$(git rev-parse "refs/heads/$BRANCH")
   REMOTE_TIP=$(git rev-parse -q --verify "refs/remotes/origin/$BRANCH" || true)
   # A squash merge leaves the tip off the trunk, so only the forge knows it shipped. Without a
-  # working gh that question goes unasked, and only origin's own copy can vouch for the branch.
+  # working gh that question gets no answer, and only origin's own copy can vouch for the branch.
   CHECKED=0
   MERGED_TIPS=""
   if MERGED_TIPS=$(gh pr list --head "$BRANCH" --state merged --json headRefOid --jq '.[].headRefOid' 2>/dev/null); then
@@ -59,7 +60,7 @@ for NAME in "$@"; do
     git branch -D "$BRANCH"
     if [ "$REMOTE_TIP" = "$TIP" ]; then
       # The lease has origin refuse the delete if the branch moved since the fetch.
-      git push --quiet --force-with-lease="refs/heads/$BRANCH:$TIP" origin --delete "$BRANCH" ||
+      git push --quiet --force-with-lease="refs/heads/$BRANCH:$TIP" origin --delete "refs/heads/$BRANCH" ||
         echo "Kept origin/$BRANCH: delete refused (see git's error above)" >&2
     elif [ -n "$REMOTE_TIP" ]; then
       echo "Kept origin/$BRANCH: it moved past the merged tip" >&2
