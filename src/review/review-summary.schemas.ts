@@ -8,9 +8,21 @@
  * through a finding.
  */
 
-export const REVIEWER_AREAS = ["correctness", "security", "conventions", "context", "maintainability", "docs"] as const;
+export const REVIEWER_AREAS = [
+  "correctness",
+  "security",
+  "conventions",
+  "context",
+  "maintainability",
+  "docs",
+  "spec",
+] as const;
 
 export type ReviewerArea = (typeof REVIEWER_AREAS)[number];
+
+export const REVIEW_DEPTHS = ["quick", "standard", "deep"] as const;
+
+export type ReviewDepth = (typeof REVIEW_DEPTHS)[number];
 
 export type Finding = {
   file: string | null;
@@ -44,6 +56,21 @@ export type Tokens = {
   total: number | null;
 };
 
+export type ModelUsage = {
+  model: string;
+  input: number | null;
+  output: number | null;
+  cache_read: number | null;
+  cache_creation: number | null;
+  cost_usd: number | null;
+};
+
+export type PermissionDenial = {
+  tool: string;
+  /** The denied call's command (Bash) or its JSON input, cut to 200 characters. */
+  input: string;
+};
+
 /** The normalised run record appended to `ci/review-metrics`, read by `review-retro`. */
 export type MetricsRecord = {
   schema_version: number;
@@ -61,6 +88,14 @@ export type MetricsRecord = {
   reviewers_skipped: ReviewerArea[];
   review_mode: "full" | "incremental";
   incremental_from_sha: string | null;
+  /** The depth a `@claude review` comment asked for; standard on every other trigger. */
+  review_depth: ReviewDepth;
+  /**
+   * The areas a `@claude review` comment restricted the review to; empty when the orchestrator
+   * gated them. A quick or area-restricted record is a partial review, which the preflight never
+   * takes as the prior.
+   */
+  review_areas: ReviewerArea[];
   prior_importants: ReviewSummary["prior_importants"] | null;
   findings: Finding[] | null;
   refuted_findings: RefutedFinding[] | null;
@@ -72,7 +107,12 @@ export type MetricsRecord = {
   cost_usd: number | null;
   duration_ms: number | null;
   num_turns: number | null;
+  /** The orchestrator's own turns only: subagent tokens are counted in `model_usage`, not here. */
   tokens: Tokens | null;
+  /** The whole run, orchestrator and every subagent, split by model; each entry's cost is its share of `cost_usd`. */
+  model_usage: ModelUsage[] | null;
+  /** Tool calls the run's permission rules refused, as the result reports them; null when it carries no list. */
+  permission_denials: PermissionDenial[] | null;
 };
 
 // Generated once with zod's toJSONSchema from the template's zod source, then frozen here so the
@@ -90,7 +130,8 @@ export const REVIEW_SUMMARY_SCHEMA: JsonSchema = {
           "conventions",
           "context",
           "maintainability",
-          "docs"
+          "docs",
+          "spec"
         ]
       },
       "description": "One entry per instance; an area repeats when several ran."
@@ -105,7 +146,8 @@ export const REVIEW_SUMMARY_SCHEMA: JsonSchema = {
           "conventions",
           "context",
           "maintainability",
-          "docs"
+          "docs",
+          "spec"
         ]
       },
       "description": "One entry per instance whose report you received and consolidated, by area as in reviewers_spawned. Emit the record only once this equals reviewers_spawned: any shortfall is posted as an incomplete review, never as a clean one."
@@ -189,7 +231,8 @@ export const REVIEW_SUMMARY_SCHEMA: JsonSchema = {
               "conventions",
               "context",
               "maintainability",
-              "docs"
+              "docs",
+              "spec"
             ],
             "description": "Reviewer area that raised it."
           },
@@ -268,7 +311,8 @@ export const REVIEW_SUMMARY_SCHEMA: JsonSchema = {
               "conventions",
               "context",
               "maintainability",
-              "docs"
+              "docs",
+              "spec"
             ],
             "description": "Reviewer area that raised it."
           },
@@ -323,6 +367,7 @@ export const REVIEW_SUMMARY_SCHEMA: JsonSchema = {
               "context",
               "maintainability",
               "docs",
+              "spec",
               "consolidator",
               "validator",
               "orchestrator",
