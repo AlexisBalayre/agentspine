@@ -1,0 +1,207 @@
+{
+  "schema_version": 3,
+  "timestamp": "2026-10-18T13:54:35.025Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39133181749",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39133181749",
+  "actor": "AlexisBalayre",
+  "commit_sha": "015a3f3d3f0a42b4bf8b131113de4f8c16da9ef8",
+  "source": "pr",
+  "pr_number": 40,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "context",
+    "conventions",
+    "maintainability",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "spec"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "review_depth": "standard",
+  "review_areas": [],
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "README.md",
+      "line": "142-146",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "important",
+      "description": "README and ADR 32 say a re-scaffold moves the emitted workflow's claude-code-action pin, but plan.utils.ts never overwrites an existing .github/workflows/claude-code-review.yml, so a re-scaffold leaves the pin where it was.",
+      "body": "**A re-scaffold doesn't move the action pin. The new README paragraph and ADR 32 both say it does.**\n\nThe README now says: \"A re-scaffold moves it too. To follow Claude Code between re-scaffolds, let Dependabot bump the workflow's actions.\" ADR 32 builds its decision to emit no `dependabot.yml` on the same idea: \"A scaffolded repository keeps its pin until it re-scaffolds\". Its cost-accepted line, \"a repository that does neither…\", treats a re-scaffold as the fallback.\n\nThe scaffolder skips the workflow when the file already exists:\n\n```ts\n} else if (existsSync(abs(target))) {\n  actions.push({ kind: \"skip\", target, reason: \"already present; never overwritten\" });\n```\n([src/plan.utils.ts:296-297](https://github.com/AlexisBalayre/agentspine/blob/015a3f3d3f0a42b4bf8b131113de4f8c16da9ef8/src/plan.utils.ts#L292-L302))\n\nNothing else rewrites the file:\n\n- `apply.utils.ts:96-103` keeps a target that already exists.\n- `--force` only bypasses the dirty-tree check.\n- No other code path writes this workflow.\n\nRunning `npx agentspine` again therefore leaves both the `claude-code-action` pin and `AGENTSPINE_VERSION` unchanged. The only sign is a `skip` line. A user who re-scaffolds to get a newer Claude Code keeps reviewing on the old one, which is the silent degradation `AGENTS.md` names as this project's failure mode.\n\nThe sentence \"Re-scaffold to move that pin.\" (README line 140, from v0.1.0) has the same flaw. This PR extends it to the Claude Code version and rests a new decision on it.\n\nPossible fix:\n\n- Say that a re-scaffold moves neither pin unless the workflow is deleted first. Then Dependabot, or a manual edit, is the only way to move the pin.\n- Revisit ADR 32's rationale and its cost-accepted line to match.\n\n- [README.md#L142-L146](https://github.com/AlexisBalayre/agentspine/blob/015a3f3d3f0a42b4bf8b131113de4f8c16da9ef8/README.md#L142-L146)\n- [docs/design/0001-architecture.md#L935-L940](https://github.com/AlexisBalayre/agentspine/blob/015a3f3d3f0a42b4bf8b131113de4f8c16da9ef8/docs/design/0001-architecture.md#L935-L940)",
+      "suggestion": null
+    },
+    {
+      "file": "README.md",
+      "line": "143",
+      "area": "maintainability",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "README hard-codes \"v1.0.251, Claude Code 2.1.301\" next to advice to let Dependabot bump the action daily, so the first merged bump makes the claim stale; the matrix hedges it as \"checked against\", the README doesn't.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "190",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The permission lock's \"agent mode passes no --permission-mode\" fact is still cited at claude-code-action v1.0.237 (fd1c128) while the pin moved to v1.0.251; the PR re-checked SENSITIVE_PATHS and the SDK version but not this, so the cite is stale (managed deny rules still hold either way).",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/capability-matrix.md",
+      "line": "153-155",
+      "area": "conventions",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new claim that claude-code-action v1.0.251's bun.lock pins claude-agent-sdk 0.3.301 (Claude Code 2.1.301) cites no file line or commit SHA, though AGENTS.md asks tool-source facts to cite file and line (decision 32 does so for dependabot-core).",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "917",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "Decision 32 says \"The template now bumps its pinned actions daily with Dependabot (its #35-#40)\" without saying \"the template\" is the upstream repository (the same decision uses \"the template the ci-review pack emits\" for templates/), so this line, and \"The template is still on upload-artifact v4\" and \"differs from the template\", read as contradicting the PR's own templates/ changes.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/workflow-sync.test.ts",
+      "line": "89-92",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new test splits on \"uses: actions/setup-node@\" and cuts each chunk at the next \"\\n\\s+- \", so a list inside a step's with: block ends the chunk early, and a package-manager-cache: false in a comment would count as set.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/workflow-sync.test.ts",
+      "line": "88",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new test's title says \"in every job\", but it checks every setup-node step: a job that lost its setup-node step would still pass, since the >0 guard is per file.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/workflow-sync.test.ts",
+      "line": "80-83",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new describe.each repeats the [template, repo copy] table a third time (also at lines 56-59 and 103-106); hoisting it to one const would make covering another file a single edit.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "README.md",
+      "line": "140",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "pre-existing",
+      "description": "\"Re-scaffold to move that pin\" (README, since v0.1.0), ADR 23 and the template's \"moves only when you re-scaffold\" comment all assume a re-scaffold rewrites the workflow, but plan.utils.ts skips an existing one, so the agentspine tooling pin never moves that way either.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "944",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "important",
+      "description": "The ADR says \"The template is still on `upload-artifact` v4\", but this PR moves the template to v7 at three sites.",
+      "refutation": "Across decisions 28-32, \"the template\" means the upstream repository this repo ports from: \"Template #16\" (line 888), \"its #35-#40\" (917), \"as the template's does\" (933). Line 945's \"It moves here\" sets that upstream against this repo, so the sentence makes no claim about templates/. At most this is the wording nit recorded at line 917."
+    },
+    {
+      "file": "docs/design/0001-architecture.md",
+      "line": "953",
+      "area": "docs",
+      "confidence": "medium",
+      "tag": "important",
+      "description": "The ADR ends with \"This differs from the template, which caches its own tooling's lockfile on purpose\", but this PR sets `package-manager-cache: false` in the template's `setup-node` steps too.",
+      "refutation": "\"Its own tooling's lockfile\" refers to the upstream template repository, which has tooling of its own. The emitted templates/ workflow runs in the user's checkout and has no lockfile of its own. Line 952 of the ADR already says every setup-node step in the emitted workflow turns the cache off, so nothing contradicts the PR. At most this is a wording nit."
+    }
+  ],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": ".claude-pr/ held only CLAUDE.md. The PR's copies of the RESTORE_PATHS entries (AGENTS.md, templates/github/workflows/claude-code-review.yml) were missing, so reviewers read them through `git show HEAD:<path>` instead."
+    },
+    {
+      "component": "correctness",
+      "description": "A combined read-only command and a standalone `git ls-tree` needed approval and did not run. The reviewer got the same information another way."
+    },
+    {
+      "component": "context",
+      "description": "Without the Dependabot docs, the reviewer guessed that a `/templates/github/workflows` directory might not be scanned. That contradicts the dependabot-core source ADR 32 cites, and the mechanism was unproven, so the finding was dropped."
+    }
+  ],
+  "comments_posted_actual": 1,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 2.7246444999999992,
+  "duration_ms": 298093,
+  "num_turns": 16,
+  "tokens": {
+    "input": 18,
+    "output": 17621,
+    "cache_read": 391433,
+    "cache_creation": 67455,
+    "total": 476527
+  },
+  "model_usage": [
+    {
+      "model": "claude-opus-5-5",
+      "input": 74,
+      "output": 41699,
+      "cache_read": 1312685,
+      "cache_creation": 193406,
+      "cost_usd": 2.266208
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "input": 42,
+      "output": 14530,
+      "cache_read": 400850,
+      "cache_creation": 109187,
+      "cost_usd": 0.45843649999999986
+    }
+  ],
+  "permission_denials": [
+    {
+      "tool": "Bash",
+      "input": "git grep -n \"actions/\\|uses:\" HEAD -- templates ':!templates/github/workflows/claude-code-review.yml' | head; git ls-tree -r --name-only HEAD templates/github; git show HEAD:templates/github/workflows"
+    },
+    {
+      "tool": "Bash",
+      "input": "git ls-tree -r --name-only HEAD templates/github"
+    },
+    {
+      "tool": "Bash",
+      "input": "git show 0a4e7b8:templates/github/workflows/claude-code-review.yml | grep -nE \"upload-artifact|download-artifact|package-manager-cache\"; git show 0a4e7b8:docs/design/0001-architecture.md | grep -n \"ci"
+    }
+  ]
+}
