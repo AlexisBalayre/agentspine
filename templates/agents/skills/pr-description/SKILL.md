@@ -19,8 +19,13 @@ If the repository keeps its own PR template (`.github/pull_request_template.md`,
 
 ## Merge Danger
 
-**Door:** one-way or two-way
-**Blast Radius:** <potential ramifications of merge>
+**Door:** <one-way or two-way>
+
+<optional: description>
+
+**Blast Radius:** <one-word description>
+
+<optional: potential ramifications of merge>
 
 Closes <ISSUE>. Part of <PARENT-ISSUE>.
 ```
