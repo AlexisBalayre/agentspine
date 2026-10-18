@@ -1,0 +1,66 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T12:36:32.137Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39127812283",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39127812283",
+  "actor": "AlexisBalayre",
+  "commit_sha": "f08ed4aa16b9511da1c0e1768693b673897ab6e3",
+  "source": "pr",
+  "pr_number": 36,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "conventions",
+    "docs"
+  ],
+  "reviewers_skipped": [
+    "security",
+    "context",
+    "maintainability"
+  ],
+  "review_mode": "full",
+  "incremental_from_sha": null,
+  "prior_importants": [],
+  "findings": [
+    {
+      "file": "test/worktree.test.ts",
+      "line": "220-231",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The auto-delete test runs `git push origin --delete` from the clone, and that push also drops the clone's `refs/remotes/origin/feature/autodeleted`. So the test never hits the case its comment describes: a forge deletes the branch while the clone still holds a stale tracking ref. To cover that case, delete the branch on the bare origin directly (`update-ref -d`, as the race test does) and assert stderr has no \"delete refused\". Otherwise, dropping `--prune` from the fetch would still pass this test.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "`.claude-pr/` held only `.claude` and `CLAUDE.md`. The workflow's `RESTORE_PATHS` entries (`AGENTS.md`, `.agents`, `templates`) were not snapshotted there, even though the restore step copies each one into `.claude-pr/$path` before taking the base copy. Reviewers read the PR's `templates/agents/scripts/worktree-remove.sh` and `.agents/worktree.env` with `git show HEAD:<path>` and `gh pr diff` instead, so coverage was not lost. Check whether the action's own restore wipes or recreates `.claude-pr/` after the workflow step runs."
+    },
+    {
+      "component": "orchestrator",
+      "description": "Only correctness, conventions and docs ran. Security was skipped because the change crosses no trust boundary. Context was skipped because no spec, protocol or CI-workflow surface changed beyond a packaging smoke assertion. Maintainability was skipped because the logic change is one refspec line."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 0.9201041,
+  "duration_ms": 108005,
+  "num_turns": 8,
+  "tokens": {
+    "input": 10,
+    "output": 5272,
+    "cache_read": 159238,
+    "cache_creation": 29416,
+    "total": 193936
+  }
+}
