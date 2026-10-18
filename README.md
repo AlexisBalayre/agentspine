@@ -91,9 +91,9 @@ npx agentspine --packs thinking,engineering
 
 | Pack | Skills |
 | :-- | :-- |
-| `thinking` | `grilling`, `grill-me`, `grill-with-docs`, `codebase-design`, `domain-modeling`, `improve-codebase-architecture`, `prototype`, `handoff`, `zoom-out`, `writing-for-agents`, `research`, `wait-what`, `to-questionnaire`, `caveman` |
-| `engineering` | `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `wizard`, `find-dead-code` |
-| `planning` | `to-spec`, `to-tickets`, `wayfinder`, `implement`; installs `thinking` and `engineering` too, since it invokes their skills |
+| `thinking` | `grilling`, `grill-me`, `grill-with-docs`, `codebase-design`, `domain-modeling`, `improve-codebase-architecture`, `prototype`, `handoff`, `zoom-out`, `writing-for-agents`, `research`, `wait-what`, `to-questionnaire`, `caveman`, `retro` |
+| `engineering` | `tdd`, `diagnosing-bugs`, `wizard`, `find-dead-code` |
+| `planning` | `to-spec`, `to-tickets`, `wayfinder`, `implement`, `implement-spec`; installs `thinking`, `engineering` and `review` too, since it invokes their skills |
 | `review` | `review-changes` (six-area multi-agent review), `address-review-comments`, `pr-description`, and the seven reviewer subagents they dispatch |
 | `ci-review` | `pr-ci-review`, `review-retro`, and a GitHub Actions workflow that reviews every PR; installs `review` too. Claude Code only, and it needs setup: see below |
 

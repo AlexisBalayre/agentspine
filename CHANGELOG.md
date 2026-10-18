@@ -8,8 +8,26 @@ repository means re-running `npx agentspine`.
 
 ## Unreleased
 
+### Added
+
+- `retro` in the `thinking` pack: a retrospective on a coding session that proposes changes to
+  the agent's environment (navigation, automated checks, review rules, steering files). On Claude
+  Code it reads the session transcript; on other hosts it asks where the transcript is.
+- `implement-spec` in the `planning` pack: implements a spec's tickets on one integration branch,
+  through parallel implementer subagents in their own worktrees, then a draft PR that is marked
+  ready once every ticket lands. It is reviewed by the CI review where the repository runs it, and
+  by `review-changes` otherwise.
+
 ### Changed
 
+- `planning` now installs `review` as well, since `implement-spec` invokes `pr-description` and
+  `review-changes`. `--packs planning` therefore also installs the seven reviewer agents.
+- The wizard's `template.sh` writes values single-quoted and reads them back intact, writes
+  through a symlink instead of replacing it, leaves the env file readable by its owner only, and
+  fails at a closed stdin instead of carrying on with an empty answer.
+- Smaller clarifications to `diagnosing-bugs`, `grilling`, `handoff`, `implement`, `tdd`,
+  `wayfinder` and `pr-description`, whose Merge Danger section now records whether a change is a
+  one-way or two-way door and its blast radius.
 - The emitted review workflow runs its orchestrator on Opus 5.5 instead of Sonnet 5, and pins the
   `opus` and `sonnet` aliases the reviewers are spawned with to `claude-opus-5-5` and
   `claude-sonnet-5-5`, so a Claude Code bump cannot move a tier silently. A review costs more per
@@ -23,6 +41,11 @@ repository means re-running `npx agentspine`.
   metrics `schema_version` is now 2. The workflow, the `pr-ci-review` skill and the tooling move
   together, so re-scaffold rather than bumping the workflow's pin by hand: the new tooling rejects
   a record from the old skill as not reviewed.
+
+### Removed
+
+- `resolving-merge-conflicts`, retired upstream. Re-scaffolding does not delete it: a repository
+  scaffolded earlier keeps `.agents/skills/resolving-merge-conflicts/` until it is removed by hand.
 
 ### Fixed
 

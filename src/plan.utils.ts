@@ -19,17 +19,17 @@ export const PACKS = {
   thinking: [
     "grilling", "grill-me", "grill-with-docs", "codebase-design", "domain-modeling",
     "improve-codebase-architecture", "handoff", "prototype", "zoom-out", "writing-for-agents",
-    "research", "wait-what", "to-questionnaire", "caveman",
+    "research", "wait-what", "to-questionnaire", "caveman", "retro",
   ],
-  engineering: ["tdd", "diagnosing-bugs", "resolving-merge-conflicts", "wizard", "find-dead-code"],
-  planning: ["to-spec", "to-tickets", "wayfinder", "implement"],
+  engineering: ["tdd", "diagnosing-bugs", "wizard", "find-dead-code"],
+  planning: ["to-spec", "to-tickets", "wayfinder", "implement", "implement-spec"],
   review: ["review-changes", "address-review-comments", "pr-description"],
   "ci-review": ["pr-ci-review", "review-retro"],
 } as const;
 
 /** Packs whose skills invoke another pack's skills by name, so installing one alone would dangle. */
 const PACK_REQUIRES: Partial<Record<Pack, Pack[]>> = {
-  planning: ["thinking", "engineering"],
+  planning: ["thinking", "engineering", "review"],
   "ci-review": ["review"],
 };
 

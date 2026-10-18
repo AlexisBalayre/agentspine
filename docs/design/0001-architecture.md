@@ -310,6 +310,9 @@ interactive path is a single confirm, and every option is reachable by flag).
 
 ## 18. Tracking the September 2026 template, and a project map instead of a layout
 
+Amended by decision 29: `planning` also requires `review`, and `resolving-merge-conflicts` is
+retired.
+
 Date: 2026-09-17
 
 The skills and reviewers were ported from a Claude Code configuration template that has since
@@ -730,3 +733,50 @@ it claims to match.
   just write. A link could not hold leftovers.
 - **Cost accepted:** the three reviewers run at a different effort on Claude Code than on opencode
   and Cursor. The matrix says so; nothing emulates the key.
+
+## 29. Tracking the October 2026 template's skills
+
+Date: 2026-10-18
+
+The template has refreshed its skills from upstream (mattpocock/skills) again and written two of
+its own. They come across with decision 18's substitutions: the project map instead of
+`.claude/project.env`, `.agents/scripts/` instead of `scripts/`, "invoke the `x` skill" instead of
+one host's Skill tool, and a fallback wherever a step assumes subagents.
+
+**Refreshed in place.** One-line clarifications to `diagnosing-bugs`, `grilling`, `handoff`,
+`implement`, `tdd`, `wayfinder` and `pr-description`, whose Merge Danger section takes upstream's
+fields. Decision 19's rule that a repository's own PR template wins still holds. The wizard's
+`template.sh` takes the template's fixes: values are written single-quoted and read back intact,
+the env file is written through a symlink rather than replacing it, and a closed stdin at a prompt
+fails the wizard instead of carrying on with an empty answer. The template creates the file `0600`
+but keeps an existing one's mode, so a `.env` copied from a checked-in example stays `0644` with a
+secret in it; replacing the file had tightened it as a side effect. Here every write takes group
+and other access off the file, or the symlink's target, before writing.
+
+**`resolving-merge-conflicts` is retired**, as upstream retired it (`daa01d8`, "No longer needed").
+
+- **Cost accepted:** a re-scaffold never deletes a skill directory, and `--check` compares only
+  what the templates ship, so a repository scaffolded earlier keeps
+  `.agents/skills/resolving-merge-conflicts/` until someone removes it.
+
+**`retro` goes into `thinking`, `implement-spec` into `planning`.** Both are user-invoked, so each
+carries `agents/openai.yaml` (decision 22). `retro` names `review-retro`, `review-changes` and
+`pr-ci-review` only as asides that hold where those are installed, like `tdd`'s pointer to
+`codebase-design` in decision 18, so `thinking` stays standalone. Claude Code is the one host whose
+transcript location is recorded in the matrix; elsewhere `retro` asks the user where the session's
+transcript is.
+
+The template's `implement-spec` ends on its CI review, which a repository scaffolded here has only
+with the `ci-review` pack. Where `.github/workflows/claude-code-review.yml` is absent, the skill
+runs `review-changes` locally instead and fixes that review's important findings the same way.
+
+**`planning` now requires `review`.** `implement-spec` invokes `pr-description` and
+`review-changes` on its main path, not as an aside, so a `planning` pack without them would dangle.
+
+- **Rejected:** a step that runs the review only if the `review` pack happens to be installed. It
+  turns the review into the step a smaller install silently skips.
+- **Cost accepted:** `--packs planning` now also installs `review`, and with it `.agents/agents/`
+  and the seven reviewer agents on the hosts that take them.
+
+**Not taken in here:** the template's worktree-removal script and its review-pipeline changes.
+Each is its own port.
