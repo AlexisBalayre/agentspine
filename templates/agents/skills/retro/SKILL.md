@@ -10,7 +10,7 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 
 1. Invoke the `writing-for-agents` skill for the writing style guide.
 
-2. Read the primary sources for the session the user specifies. If the user doesn't specify a session, default to the current one. Claude Code keeps each session's transcript at `~/.claude/projects/<project path with every character but letters and digits replaced by "-">/<session id>.jsonl`. On any other host, ask the user where its transcript is, or work from the current conversation when that is the session; never guess a path.
+2. Read the primary sources for the session the user specifies. If the user doesn't specify a session, default to the current one. Claude Code keeps each session's transcript at `~/.claude/projects/<project path with every character but letters and digits replaced by "-">/<session id>.jsonl`; that naming is observed, not documented, so if the directory is not there, ask the user which one under `~/.claude/projects/` is this project's. On any other host, ask the user where its transcript is, or work from the current conversation when that is the session; never guess a path.
 
 3. Look for candidates for improvement in these categories.
 

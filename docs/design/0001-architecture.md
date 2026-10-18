@@ -310,6 +310,9 @@ interactive path is a single confirm, and every option is reachable by flag).
 
 ## 18. Tracking the September 2026 template, and a project map instead of a layout
 
+Amended by decision 29: `planning` also requires `review`, and `resolving-merge-conflicts` is
+retired.
+
 Date: 2026-09-17
 
 The skills and reviewers were ported from a Claude Code configuration template that has since
@@ -744,8 +747,11 @@ one host's Skill tool, and a fallback wherever a step assumes subagents.
 `implement`, `tdd`, `wayfinder` and `pr-description`, whose Merge Danger section takes upstream's
 fields. Decision 19's rule that a repository's own PR template wins still holds. The wizard's
 `template.sh` takes the template's fixes: values are written single-quoted and read back intact,
-the env file is created `0600` and written through a symlink rather than replacing it, and a closed
-stdin at a prompt fails the wizard instead of carrying on with an empty answer.
+the env file is written through a symlink rather than replacing it, and a closed stdin at a prompt
+fails the wizard instead of carrying on with an empty answer. The template creates the file `0600`
+but keeps an existing one's mode, so a `.env` copied from a checked-in example stays `0644` with a
+secret in it; replacing the file had tightened it as a side effect. Here every write takes group
+and other access off the file, or the symlink's target, before writing.
 
 **`resolving-merge-conflicts` is retired**, as upstream retired it (`daa01d8`, "No longer needed").
 

@@ -100,9 +100,11 @@ restores implicit invocation. A test asserts the emitted payload for that reason
 - **`retro` knows where to find a transcript only on Claude Code.** Claude Code documents that a
   session's transcript is a `<session id>.jsonl` under `~/.claude/projects/`, and hands hooks its
   path as `transcript_path` (D, read 2026-10-18). How the project directory under it is named is
-  not documented: every character but letters and digits becomes `-`, observed 2026-10-18. The
-  other four hosts' transcript locations are unverified, so there the skill asks the user rather
-  than guess a path.
+  not documented, and there is no source to read: the public repository holds plugins and docs,
+  and the npm package ships a native binary (2.1.302, checked 2026-10-18). Every character but
+  letters and digits becomes `-`, observed 2026-10-18, so `retro` checks that directory exists
+  and asks the user when it does not. The other four hosts' transcript locations are unverified,
+  so there the skill asks the user rather than guess a path.
 
 - **opencode cannot enforce at turn-end.** `session.idle` fires after the turn, and opencode
   offers no documented way to feed hook output back into the agent's context, so a failing gate is

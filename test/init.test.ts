@@ -196,6 +196,8 @@ describe("skill packs", () => {
     expect(existsSync(path.join(repo, ".agents/skills/wayfinder/SKILL.md"))).toBe(true);
     expect(existsSync(path.join(repo, ".agents/skills/grilling/SKILL.md"))).toBe(true);
     expect(existsSync(path.join(repo, ".agents/skills/tdd/SKILL.md"))).toBe(true);
+    expect(existsSync(path.join(repo, ".agents/skills/implement-spec/SKILL.md"))).toBe(true);
+    expect(existsSync(path.join(repo, ".agents/skills/pr-description/SKILL.md"))).toBe(true);
     expect(existsSync(path.join(repo, ".agents/skills/review-changes/SKILL.md"))).toBe(true);
     expect(stdout).toContain(".agents/skills/grilling");
   });

@@ -22,9 +22,9 @@ repository means re-running `npx agentspine`.
 
 - `planning` now installs `review` as well, since `implement-spec` invokes `pr-description` and
   `review-changes`. `--packs planning` therefore also installs the seven reviewer agents.
-- The wizard's `template.sh` writes values single-quoted and reads them back intact, creates the
-  env file readable by its owner only, writes through a symlink instead of replacing it, and fails
-  at a closed stdin instead of carrying on with an empty answer.
+- The wizard's `template.sh` writes values single-quoted and reads them back intact, writes
+  through a symlink instead of replacing it, leaves the env file readable by its owner only, and
+  fails at a closed stdin instead of carrying on with an empty answer.
 - Smaller clarifications to `diagnosing-bugs`, `grilling`, `handoff`, `implement`, `tdd`,
   `wayfinder` and `pr-description`, whose Merge Danger section now records whether a change is a
   one-way or two-way door and its blast radius.
