@@ -142,9 +142,9 @@ const claudeHooks = (hooks: boolean) =>
       }
     : {};
 
-// Hooks run outside the sandbox and read their policies from .agents/, and skills load from it
-// through the .claude/skills link, so a sandboxed command must not write it, hooks or not
-// (decision 34). Inert until the user turns the sandbox on.
+// Hooks run outside the sandbox and read their policies from .agents/, and every tool loads skills
+// from it, Claude Code through the .claude/skills link when it is one, so a sandboxed command must
+// not write it, hooks or not (decision 34). Inert until the user turns the sandbox on.
 const CLAUDE_SANDBOX = { sandbox: { filesystem: { denyWrite: ["./.agents"] } } };
 
 const REPO_ROOT_CMD = '"$(git rev-parse --show-toplevel)"';

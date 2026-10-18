@@ -1020,9 +1020,17 @@ had the hole, since its hooks live in `.claude/hooks`, which Claude Code's sandb
 
 **`.claude/settings.json` denies sandboxed writes to `./.agents`**, through
 `sandbox.filesystem.denyWrite`. It is emitted whenever Claude Code is a target, `--skip-hooks`
-included, since Claude Code loads skills from `.agents/skills` through the `.claude/skills` link
-either way. It does nothing until the user turns the sandbox on, and the deep merge keeps the
-user's own entries beside it.
+included: Claude Code loads skills from `.agents/skills` through the `.claude/skills` link when it
+is one, and the other four tools load theirs from `.agents/skills` directly. It does nothing until
+the user turns the sandbox on, and the deep merge keeps the user's own entries beside it.
+
+**git-safety reads `GIT_TRUNK` from `.env` as data.** It used to source the file, on every Bash
+call and outside the sandbox, and `.env` sits at the project root, outside `.agents/`. It now
+takes the last `GIT_TRUNK=` line, with or without `export`, strips one pair of quotes or a
+trailing comment, and runs nothing else in the file.
+
+- **Rejected:** denying `./.env` as well. It is per-machine config that the `wizard` skill and
+  the project's own tooling write.
 
 - **Rejected:** an `Edit(./.agents/**)` deny rule. Claude Code adds it to `denyWrite` as well, but
   it also stops Claude's Edit tool, which `adapt-to-project` uses to write `quality.toml` and
@@ -1045,7 +1053,12 @@ user's own entries beside it.
   links into needs its own entry. A scaffolded `.agents/` holds real directories. This repository
   links four of them into `templates/agents/` and denies that path too, held by
   `test/repo-settings.test.ts`.
-- **Not closed here:** the gate runs the project's own linters and type checkers, whose configs a
-  sandboxed command can still write. Those paths are the project's to deny.
+- **Cost accepted:** a sandboxed command can still change which branch git-safety guards, by
+  writing `GIT_TRUNK` into `.env`. A value written with shell syntax, such as `$(...)`, is now
+  read as text.
+- **Not closed here:** the gate runs the project's own tooling, which reads files a sandboxed
+  command can still write: linter and type-checker configs, the `package.json` script behind
+  `pnpm typecheck`, the `build.rs` behind `cargo check`, and the `node_modules/.bin` entry behind
+  `npx tsc`. Those paths are the project's to deny.
 - **Cursor** has a sandbox but no setting that denies a write inside the workspace, which the
   matrix records as a gap. opencode and Mistral Vibe run commands without one.

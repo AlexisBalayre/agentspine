@@ -88,9 +88,9 @@ restores implicit invocation. A test asserts the emitted payload for that reason
 ## Who can rewrite `.agents/` from a sandboxed command
 
 Read 2026-10-18. Hooks read their policies from `.agents/hooks/`, and the turn-end gate its
-commands from `.agents/quality.toml`. Where a hook runs outside the sandbox, a sandboxed command
-that can write `.agents/` chooses what the next hook runs with the user's full access
-(decision 34).
+commands from `.agents/quality.toml`; git-safety reads `GIT_TRUNK` from `.env`, as data. Where a
+hook runs outside the sandbox, a sandboxed command that can write `.agents/` chooses what the
+next hook runs with the user's full access (decision 34).
 
 | Tool | Where hooks run | `.agents/` from a sandboxed command |
 | :-- | :-- | :-- |
@@ -301,17 +301,18 @@ rows are honest about which claims are tested and which are read.
   - https://code.claude.com/docs/en/headless ("Turn off permission prompts in unattended runs")
   - https://code.claude.com/docs/en/agent-sdk/cost-tracking ("Break down usage per model")
 - Who can rewrite `.agents/`, all read 2026-10-18:
-  - Claude Code — https://code.claude.com/docs/en/sandboxing ("What runs outside the sandbox",
+  - Claude Code: https://code.claude.com/docs/en/sandboxing ("What runs outside the sandbox",
     "Protected paths", "Repository settings under an admin-required sandbox", "A git command
     fails with `unable to unlink old`"), https://code.claude.com/docs/en/settings-reference
     ("Sandbox path prefixes", `sandbox.filesystem.denyWrite`); source
     `anthropic-experimental/sandbox-runtime@626a596`, `src/sandbox/sandbox-utils.ts`
-  - Codex — source `openai/codex@8c07694`, `codex-rs/protocol/src/permissions.rs`,
+  - The probe: sandbox-runtime 0.0.80 (tag `v0.0.80`, `626a596`) on macOS 26.6.2, 2026-10-18
+  - Codex: source `openai/codex@8c07694`, `codex-rs/protocol/src/permissions.rs`,
     `codex-rs/hooks/src/engine/command_runner.rs`
-  - Cursor — https://cursor.com/docs/reference/sandbox ("Protected paths"),
+  - Cursor: https://cursor.com/docs/reference/sandbox ("Protected paths"),
     https://cursor.com/docs/hooks
-  - opencode — source `anomalyco/opencode@da9d436`, `SECURITY.md`
-  - Mistral Vibe — source `mistralai/mistral-vibe@4ae5c59`, `vibe/core/hooks/executor.py`,
+  - opencode: source `anomalyco/opencode@da9d436`, `SECURITY.md`
+  - Mistral Vibe: source `mistralai/mistral-vibe@4ae5c59`, `vibe/core/hooks/executor.py`,
     `README.md` ("Sandboxed sessions")
 - Skill invocation control, all read 2026-09-17:
   - Claude Code — https://code.claude.com/docs/en/skills ("Control who invokes a skill")

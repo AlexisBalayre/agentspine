@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -421,5 +421,57 @@ describe("git-safety follows cd and -C to the checkout a command runs in", () =>
   ])("keeps reading the session's directory after %s", (_label, command) => {
     const { root, tree } = repoWithWorktree();
     expect(run(root, command(tree)).status).toBe(2);
+  });
+});
+
+/**
+ * git-safety runs outside Claude Code's sandbox, and a sandboxed command can write `.env`, so
+ * sourcing it ran whatever such a command put there with the user's full access (decision 34).
+ */
+describe("git-safety reads GIT_TRUNK from .env as data", () => {
+  function repoOnDevelop(env: string) {
+    const root = mkdtempSync(path.join(tmpdir(), "agentspine-env-"));
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
+    git("init", "-q", "-b", "develop");
+    writeFileSync(path.join(root, "a.txt"), "x\n");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+    writeFileSync(path.join(root, ".env"), env);
+    return root;
+  }
+
+  const commit = (root: string) =>
+    spawnSync("bash", [ADAPTER, "git-safety"], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse",
+        tool_name: "Bash",
+        cwd: root,
+        tool_input: { command: "git commit -m work" },
+      }),
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+
+  it.each([
+    ["a plain value", "GIT_TRUNK=develop\n"],
+    ["an exported, double-quoted value", 'export GIT_TRUNK="develop"\n'],
+    ["a single-quoted value and a comment", "GIT_TRUNK='develop' # the trunk\n"],
+    ["CRLF line endings, after another key", "API_URL=http://localhost\r\nGIT_TRUNK=develop\r\n"],
+    ["the last of two values", "GIT_TRUNK=main\nGIT_TRUNK=develop\n"],
+  ])("guards the trunk named by %s", (_label, env) => {
+    expect(commit(repoOnDevelop(env)).status).toBe(2);
+  });
+
+  it("guards main when .env names no trunk", () => {
+    expect(commit(repoOnDevelop("API_URL=http://localhost\n")).status).toBe(0);
+  });
+
+  it("runs nothing written into .env", () => {
+    const root = repoOnDevelop("");
+    const marker = path.join(root, "ran");
+    writeFileSync(path.join(root, ".env"), `touch ${marker}\nGIT_TRUNK=$(touch ${marker})\n`);
+    commit(root);
+    expect(existsSync(marker)).toBe(false);
   });
 });

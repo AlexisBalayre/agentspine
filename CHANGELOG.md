@@ -115,6 +115,9 @@ workflow and committing the deletion, then re-running
   or the quality gate's commands that hooks run outside it. It takes effect once the sandbox is
   on, and is written with `--skip-hooks` too. A sandboxed `git checkout` or `npx agentspine` that
   must write under `.agents/` now fails, and has to run outside the sandbox.
+- git-safety reads `GIT_TRUNK` from `.env` as data instead of sourcing the file, which ran any
+  command written there on every Bash call, outside Claude Code's sandbox. A value written with
+  shell syntax, such as `$(...)`, is now read as text.
 - The emitted review workflow locks the model's permissions in managed settings, which a PR's
   files cannot widen: read-only `gh` and `git` verbs only, file edits denied in every mode, and
   Bash in a sandbox that writes only to the checkout and Claude Code's temp directory, reaches only
