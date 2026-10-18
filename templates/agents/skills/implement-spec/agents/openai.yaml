@@ -1,0 +1,6 @@
+# Codex ignores Claude Code's `disable-model-invocation`, so this is its equivalent: the skill stays
+# out of the model's prompt, and a human invokes it explicitly with `$<name>` or through `/skills`.
+# Codex warns and ignores a file it cannot parse, which silently restores implicit invocation, so
+# the shape here is asserted by a test rather than trusted.
+policy:
+  allow_implicit_invocation: false

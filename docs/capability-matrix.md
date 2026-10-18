@@ -60,8 +60,8 @@ Neither holds for agents. See decision 8 in [`design/0001-architecture.md`](desi
 
 ## Skill invocation control
 
-Some shipped skills are meant to run only when a human names them: the four `planning` skills,
-`adapt-to-project`, `grill-me`, `find-dead-code` and others. They say so with Claude Code's
+Some shipped skills are meant to run only when a human names them: the five `planning` skills,
+`adapt-to-project`, `grill-me`, `find-dead-code`, `retro` and others. They say so with Claude Code's
 `disable-model-invocation: true` in frontmatter, which is the authoritative list. Verified
 2026-09-17 (**D** documented, **S** read in source):
 
@@ -97,6 +97,12 @@ restores implicit invocation. A test asserts the emitted payload for that reason
   `src/skill/index.ts:314`), but an undocumented behaviour can change in a patch release, and the
   failure mode is a skill no one can reach, which is worse than the gap. Revisit when opencode
   documents slash-command invocation of skills.
+- **`retro` knows where to find a transcript only on Claude Code.** Claude Code documents that a
+  session's transcript is a `<session id>.jsonl` under `~/.claude/projects/`, and hands hooks its
+  path as `transcript_path` (D, read 2026-10-18). How the project directory under it is named is
+  not documented: every character but letters and digits becomes `-`, observed 2026-10-18. The
+  other four hosts' transcript locations are unverified, so there the skill asks the user rather
+  than guess a path.
 
 - **opencode cannot enforce at turn-end.** `session.idle` fires after the turn, and opencode
   offers no documented way to feed hook output back into the agent's context, so a failing gate is
@@ -167,6 +173,8 @@ rows are honest about which claims are tested and which are read.
     https://code.claude.com/docs/en/model-config ("Adjust effort level")
   - opencode — https://opencode.ai/docs/agents/ ("Additional")
   - Cursor — https://cursor.com/docs/context/subagents
+- Session transcripts, read 2026-10-18: Claude Code — https://code.claude.com/docs/en/hooks
+  (`transcript_path` in the common input fields)
 - Skill invocation control, all read 2026-09-17:
   - Claude Code — https://code.claude.com/docs/en/skills ("Control who invokes a skill")
   - Cursor — https://cursor.com/docs/context/skills

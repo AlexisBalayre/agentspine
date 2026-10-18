@@ -188,13 +188,15 @@ describe("skill packs", () => {
     expect(existsSync(path.join(repo, ".agents/skills/adapt-to-project/SKILL.md"))).toBe(true);
   });
 
-  // wayfinder invokes grilling and research, implement invokes tdd: a planning pack without
-  // them would name skills that are not there.
+  // wayfinder invokes grilling and research, implement invokes tdd, implement-spec invokes
+  // pr-description and review-changes: a planning pack without them would name skills that are
+  // not there.
   it("installs the packs that planning skills invoke", () => {
     const { stdout } = runCli(["--dir", repo, "--yes", "--packs", "planning"]);
     expect(existsSync(path.join(repo, ".agents/skills/wayfinder/SKILL.md"))).toBe(true);
     expect(existsSync(path.join(repo, ".agents/skills/grilling/SKILL.md"))).toBe(true);
     expect(existsSync(path.join(repo, ".agents/skills/tdd/SKILL.md"))).toBe(true);
+    expect(existsSync(path.join(repo, ".agents/skills/review-changes/SKILL.md"))).toBe(true);
     expect(stdout).toContain(".agents/skills/grilling");
   });
 
