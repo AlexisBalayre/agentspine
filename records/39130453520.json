@@ -1,0 +1,144 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-10-18T13:16:48.521Z",
+  "repository": "AlexisBalayre/agentspine",
+  "run_id": "39130453520",
+  "run_url": "https://github.com/AlexisBalayre/agentspine/actions/runs/39130453520",
+  "actor": "AlexisBalayre",
+  "commit_sha": "afaaddb4badc080e83f88b47ffa50b397dbf06a3",
+  "source": "pr",
+  "pr_number": 37,
+  "action": "review",
+  "reviewers_spawned": [
+    "correctness",
+    "security",
+    "maintainability",
+    "conventions",
+    "docs",
+    "context"
+  ],
+  "reviewers_returned": [
+    "correctness",
+    "security",
+    "maintainability",
+    "conventions",
+    "docs",
+    "context"
+  ],
+  "reviewers_skipped": [],
+  "review_mode": "incremental",
+  "incremental_from_sha": "73030bc249d794a975ad07d67a61eef5185fb318",
+  "prior_importants": [
+    {
+      "file": "src/review/review-body.utils.ts",
+      "line": "51-60",
+      "status": "resolved"
+    }
+  ],
+  "findings": [
+    {
+      "file": "src/review/post.script.ts",
+      "line": "200-210",
+      "area": "correctness",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "A partial pass that dies or cannot post now sets no failure status, because the `if (partial)` branch runs before the `failure` branch. That contradicts README L127 (\"A run that dies ... fails the check\"). Statuses are also per SHA, so after a push a partial pass leaves `claude-review` absent on the new head, which a required check reads as \"waiting\". Neither case is documented. Either set `failure` on a failed partial pass and skip only `success`, or document both.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "236-239",
+      "area": "context",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The lock comment (and its twin in templates/github/workflows/claude-code-review.yml) calls the built-in read-only commands \"a set no setting changes\". The matrix row says an `ask` or `deny` rule changes it, and the lock's own managed `Bash(git *--output*)` deny already narrows the read-only git forms. Reword to \"a set only a managed ask or deny rule narrows\".",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "src/review/review-body.utils.ts",
+      "line": "53-66",
+      "area": "correctness",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "A relocated suggestion now goes through `inertFences`, so it is no longer posted as written. `<pre` gets an invisible U+200B, which breaks pasted JSX or HTML, and ```` ```ts title ```` becomes ```` ```text ts title ````. Yet the comment at L53-54 still says it \"is posted exactly as written\", and L57 still says \"Same text\".",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "test/review/review-body-utils.test.ts",
+      "line": "73-81",
+      "area": "security",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "The new relocated-suggestion test would pass even without its open-fence body, and it checks only for a backtick `suggestion` fence line. A tilde `~~~suggestion`, a `> ```suggestion`, or a `<pre lang=\"suggestion\">` after an open `<textarea>` in the body would all go uncaught. Add cases for these to pin the protection down.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "templates/agents/skills/pr-ci-review/SKILL.md",
+      "line": "107",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "SKILL.md lists the built-in read-only commands as `ls, cat, head, tail, grep, find, wc, cd` and then says \"nothing else\", but the matrix row also lists `echo`, `pwd`, `diff`, `stat`, `du` and `which`. Make the two lists match, or mark the SKILL.md list as examples.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "src/review/review-body.utils.ts",
+      "line": "59-68",
+      "area": "maintainability",
+      "confidence": "medium",
+      "tag": "nit",
+      "description": "`commentBody` tests `relocated` twice, in two ternaries, to pair an inert fence with inert text. An `if (relocated)` / `else` that pushes each case whole would keep the pairing in one place.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": "CHANGELOG.md",
+      "line": "34",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The edited `@claude review` bullet's second line runs well past the ~100-column wrap of the lines around it. Rewrap so `deep` starts a new line.",
+      "body": null,
+      "suggestion": null
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "line": "244",
+      "area": "docs",
+      "confidence": "high",
+      "tag": "nit",
+      "description": "The reflowed lock comment leaves one over-long line (\"# off. None of the verbs writes: ... so a PR whose diff\") among lines wrapped near 80 columns, in both this file and its template twin. Rewrap from `off.` onward.",
+      "body": null,
+      "suggestion": null
+    }
+  ],
+  "refuted_findings": [],
+  "process_issues": [
+    {
+      "component": "platform",
+      "description": "As in the prior round, `.claude-pr/` held only CLAUDE.md, with no AGENTS.md, .agents or templates, even though RESTORE_PATHS names them. Reviewers were told to read the PR's copies with `git show HEAD:<path>` instead."
+    },
+    {
+      "component": "orchestrator",
+      "description": "Each area ran a single instance even though the delta touches 17 files across several top-level areas, which the file-count size gate would scale to 2. Only about 30 lines of logic changed and the rest is prose, so a second instance would have added nothing."
+    }
+  ],
+  "comments_posted_actual": 0,
+  "is_error": false,
+  "incomplete_reason": null,
+  "cost_usd": 2.3527023,
+  "duration_ms": 271025,
+  "num_turns": 14,
+  "tokens": {
+    "input": 16,
+    "output": 12537,
+    "cache_read": 336616,
+    "cache_creation": 57146,
+    "total": 406315
+  }
+}
