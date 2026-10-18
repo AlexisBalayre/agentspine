@@ -27,8 +27,8 @@ on:
 env:
   NODE_VERSION: "22"
   # The review tooling ships inside agentspine, pinned because this workflow, the pr-ci-review
-  # skill and the poster share a contract. A re-scaffold updates the skill but never rewrites
-  # this file, so delete it before re-scaffolding to move all three.
+  # skill and the poster share a contract. Re-running agentspine with --packs ci-review updates
+  # the skill but never rewrites this file, so delete it (and commit that) first to move all three.
   AGENTSPINE_VERSION: "__AGENTSPINE_VERSION__"
   # Config the model executes at startup, restored from the base branch below so a PR cannot
   # rewrite the reviewer that reviews it. Add any path the shared tree resolves through: if

@@ -522,7 +522,8 @@ published, that pack shipped a red step. The pin is written at scaffold time, wh
 between the workflow, the `pr-ci-review` skill and the poster immovable until someone re-scaffolds.
 
 Amended by decision 32: a re-scaffold skips a workflow that already exists, so it does not move the
-pin. Only deleting the workflow first, or editing it by hand, does.
+pin, while a re-run with `--packs ci-review` still updates the skill, which can then outrun the
+tooling the workflow pins. Only deleting the workflow first, or editing it by hand, moves the pin.
 
 Published as `0.1.0` rather than `1.0.0`: the flag set is a public API from here (decision 10), the
 CI record's `schema_version` is its own contract, and three of the five tools are still wired from
@@ -938,7 +939,8 @@ given (`github_actions/lib/dependabot/github_actions/file_fetcher.rb:166-180`, d
 **The pack emits no `dependabot.yml`.** The README gives the snippet that moves the action pins
 daily instead. Decision 23 assumed a re-scaffold moves the pins too, but the scaffolder skips a
 workflow that already exists (`src/plan.utils.ts`, "already present; never overwritten"). A pin
-moves only when someone edits the workflow, or deletes it and re-scaffolds; the README says so.
+moves only when someone edits the workflow, or deletes it and re-scaffolds with `--packs ci-review`
+(packs come from the command line alone); the README gives the steps.
 
 - **Rejected:** writing one with `ci-review`. The file may already exist in the user's `.github/`,
   and a daily stream of pull requests is that repository's policy to choose.
