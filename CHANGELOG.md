@@ -8,7 +8,7 @@ rewrites an existing workflow, so upgrading a scaffolded repository's review mea
 workflow and committing the deletion, then re-running
 `npx agentspine --yes --packs ci-review,<every other pack it uses>`.
 
-## Unreleased
+## 0.2.0 — 2026-10-18
 
 ### Added
 
@@ -40,8 +40,7 @@ workflow and committing the deletion, then re-running
   review, 👎 when important findings were posted, 😕 when the run never reached one. The poster
   job gains `issues: write` for it.
 - The metrics record carries `model_usage` (the run's tokens and cost split by model, subagents
-  included), `review_depth`, `review_areas` and `permission_denials`; `schema_version` is now 3.
-  `tokens` is labelled as the orchestrator's own turns, which it always was.
+  included), `review_depth`, `review_areas` and `permission_denials`. `tokens` is labelled as the orchestrator's own turns, which it always was.
 
 ### Changed
 
@@ -71,10 +70,11 @@ workflow and committing the deletion, then re-running
   and `review-validator` ask for `effort: high` there. The key stays out of the shared manifests
   because opencode forwards an agent key it does not know to the model provider. Re-scaffolding
   replaces the old link. An edit under `.agents/agents/` no longer reaches Claude Code.
-- The review record carries `reviewers_returned`, and the metrics record `incomplete_reason`; the
-  metrics `schema_version` is now 2. The workflow, the `pr-ci-review` skill and the tooling move
-  together, so upgrade as the note at the top says rather than bumping the workflow's pin by
-  hand: the new tooling rejects a record from the old skill as not reviewed.
+- The review record carries `reviewers_returned`, and the metrics record `incomplete_reason`.
+  With the fields under Added, the metrics `schema_version` goes from 1 to 3. The workflow, the
+  `pr-ci-review` skill and the tooling move together, so upgrade as the note at the top says
+  rather than bumping the workflow's pin by hand: the new tooling rejects a record from the old
+  skill as not reviewed.
 
 ### Removed
 
