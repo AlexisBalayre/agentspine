@@ -1006,3 +1006,71 @@ Three holes in remove come with it, each with a test watched failing:
   after the forge's "Update branch" or an accepted suggestion, does not count as shipped. `--merged`
   keeps that worktree and says to pull and retry. Counting an ancestor would need the merged head
   locally, which a squash merge whose branch the forge deleted never provides.
+
+## 34. Sandboxed commands cannot rewrite `.agents/` on Claude Code
+
+Date: 2026-10-18
+
+Every hook reads its policy from `.agents/hooks/`, and the turn-end gate reads its commands from
+`.agents/quality.toml`. Claude Code runs hooks outside its sandbox, with the user's full access,
+and the sandbox protects `.claude/settings.json` but not the scripts it names under `.agents/`. A
+sandboxed command could rewrite a policy or a gate command, and the next hook would run it
+unsandboxed. Codex makes a top-level `.agents` directory read-only on its own. The template never
+had the hole, since its hooks live in `.claude/hooks`, which Claude Code's sandbox protects.
+
+**`.claude/settings.json` denies sandboxed writes to `./.agents`**, through
+`sandbox.filesystem.denyWrite`. It is emitted whenever Claude Code is a target, `--skip-hooks`
+included: Claude Code loads skills from `.agents/skills` through the `.claude/skills` link when it
+is one, and the other four tools load theirs from `.agents/skills` directly. It does nothing until
+the user turns the sandbox on, and the deep merge keeps the user's own entries beside it.
+
+- **Rejected:** an `Edit(./.agents/**)` deny rule. Claude Code adds it to `denyWrite` as well, but
+  it also stops Claude's Edit tool, which `adapt-to-project` uses to write `quality.toml` and
+  `worktree.env`, and which `retro` uses to add a policy or a gate command.
+- **Rejected:** moving the hooks to `.claude/hooks`, as the template does. Every tool's adapter
+  runs the same policy files from `.agents/` (decisions 3 and 4), and `quality.toml` would stay
+  there anyway.
+- **Rejected:** a `./**/.agents` entry, to reach the `.agents/` of a worktree nested in the
+  checkout. Claude Code skips a `denyWrite` entry holding a wildcard on Linux and WSL2.
+
+- **Cost accepted:** a sandboxed `git checkout`, `pull` or `rebase` that must replace a file under
+  `.agents/` fails with `unable to unlink old`, and Claude offers to rerun it outside the sandbox.
+  A sandboxed `npx agentspine` cannot write `.agents/` either. The Edit tool and the user's own
+  terminal are unaffected.
+- **Cost accepted:** the entry covers the checkout the session runs in. A session in the main
+  checkout can still write `.worktrees/<name>/.agents/`, as it can that worktree's
+  `.claude/settings.json`: Claude Code protects its own files in the working directory and the
+  directories above it, not below.
+- **Cost accepted:** a deny reaches the path a write resolves to, so a directory that `.agents/`
+  links into needs its own entry. A scaffolded `.agents/` holds real directories. This repository
+  links four of them into `templates/agents/` and denies that path too, held by
+  `test/repo-settings.test.ts`.
+
+- **Not closed here:** the gate runs the project's own tooling, which reads files a sandboxed
+  command can still write: linter and type-checker configs, the `package.json` script behind
+  `pnpm typecheck`, the `build.rs` behind `cargo check`, and the `node_modules/.bin` entry behind
+  `npx tsc`. Those paths are the project's to deny.
+- **Cursor** has a sandbox but no setting that denies a write inside the workspace, which the
+  matrix records as a gap. opencode and Mistral Vibe run commands without one.
+
+**git-safety reads `GIT_TRUNK` from `.env` as data.** It used to source the file, on every Bash
+call and outside the sandbox, and `.env` sits at the project root, outside `.agents/`. It now
+takes the value on the last `GIT_TRUNK=` line, with or without `export`: up to the closing quote
+when the value is quoted, up to the first whitespace when it is not. Nothing else in the file
+runs, and a file it cannot read leaves the trunk at `main` rather than ending the policy, which
+would turn off every rule. Only the first 64 KiB is read: Claude Code lets the call through when a
+`PreToolUse` hook outlasts its timeout (capability matrix, "Hook interfaces"), 5 seconds here, and
+the unbounded read took 8 seconds on a sparse 1 GiB `.env` on macOS.
+
+- **Rejected:** denying `./.env` as well. It is per-machine config that the `wizard` skill and
+  the project's own tooling write.
+- **Cost accepted:** a sandboxed command can still change which branch git-safety guards, by
+  writing `GIT_TRUNK` into `.env` or making the file unreadable.
+- **Cost accepted:** a `.env` that sets `GIT_TRUNK` with shell syntax, such as
+  `GIT_TRUNK=$DEFAULT_BRANCH`, now hands git-safety that text, not its value. A `GIT_TRUNK` line
+  past the first 64 KiB is not read, and one that crosses that byte is cut short there.
+- **Cost accepted:** a sandboxed process can still hold the read of `.env` past the hook's
+  timeout, with a Linux write lease on the file or a FIFO put in its place after the `-f` test,
+  and Claude Code then lets the call through. So can any file a hook reads that the sandbox can
+  write. `"onFailure": "block"` would close it, but makes every failing or timed-out hook block the
+  call, against the adapters' rule of failing open (decision 12).

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -421,5 +421,79 @@ describe("git-safety follows cd and -C to the checkout a command runs in", () =>
   ])("keeps reading the session's directory after %s", (_label, command) => {
     const { root, tree } = repoWithWorktree();
     expect(run(root, command(tree)).status).toBe(2);
+  });
+});
+
+/**
+ * git-safety runs outside Claude Code's sandbox, and a sandboxed command can write `.env`, so
+ * sourcing it ran whatever such a command put there with the user's full access (decision 34).
+ */
+describe("git-safety reads GIT_TRUNK from .env as data", () => {
+  function repoWithEnv(env: string, branch = "develop") {
+    const root = mkdtempSync(path.join(tmpdir(), "agentspine-env-"));
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
+    git("init", "-q", "-b", branch);
+    writeFileSync(path.join(root, "a.txt"), "x\n");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+    writeFileSync(path.join(root, ".env"), env);
+    return root;
+  }
+
+  const commit = (root: string) =>
+    spawnSync("bash", [ADAPTER, "git-safety"], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse",
+        tool_name: "Bash",
+        cwd: root,
+        tool_input: { command: "git commit -m work" },
+      }),
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+
+  it.each([
+    ["a plain value", "GIT_TRUNK=develop\n"],
+    ["an exported, double-quoted value", 'export GIT_TRUNK="develop"\n'],
+    ["a single-quoted value and a comment", "GIT_TRUNK='develop' # the trunk\n"],
+    ["CRLF line endings, after another key", "API_URL=http://localhost\r\nGIT_TRUNK=develop\r\n"],
+    ["the last of two values", "GIT_TRUNK=main\nGIT_TRUNK=develop\n"],
+  ])("guards the trunk named by %s", (_label, env) => {
+    expect(commit(repoWithEnv(env)).status).toBe(2);
+  });
+
+  it("guards main when .env names no trunk", () => {
+    expect(commit(repoWithEnv("API_URL=http://localhost\n")).status).toBe(0);
+  });
+
+  // The last line makes the policy block, which shows it read the file rather than ending early.
+  it("runs nothing written into .env", () => {
+    const root = repoWithEnv("");
+    const marker = path.join(root, "ran");
+    writeFileSync(path.join(root, ".env"), `touch ${marker}\nGIT_TRUNK=$(touch ${marker})\nGIT_TRUNK=develop\n`);
+    const { status, stderr } = commit(root);
+    expect(existsSync(marker)).toBe(false);
+    expect(status).toBe(2);
+    expect(stderr).toContain("you are on develop");
+  });
+
+  // A policy that ends early turns off every rule, so a .env it cannot read must leave it running.
+  // Root reads the file whatever its mode, so there the test could not fail.
+  it.skipIf(process.getuid?.() === 0)("keeps guarding main when .env cannot be read", () => {
+    const root = repoWithEnv("API_URL=http://localhost\n", "main");
+    chmodSync(path.join(root, ".env"), 0o000);
+    const { status, stderr } = commit(root);
+    expect(status).toBe(2);
+    expect(stderr).toContain("you are on main");
+  });
+
+  // Claude Code lets the command run when a hook outlasts its timeout, so only a bounded head of
+  // .env is read, which a huge sparse file would otherwise turn into seconds.
+  it("ignores a GIT_TRUNK line past the first 64 KiB of .env", () => {
+    const root = repoWithEnv(`#${"x".repeat(65536)}\nGIT_TRUNK=develop\n`, "main");
+    const { status, stderr } = commit(root);
+    expect(status).toBe(2);
+    expect(stderr).toContain("you are on main");
   });
 });

@@ -8,11 +8,18 @@ COMMAND="${AGENT_COMMAND:-}"
 [ -n "$COMMAND" ] || exit 0
 
 PROJECT_DIR="${AGENT_PROJECT_DIR:-.}"
+# Read as data, never sourced: this runs outside Claude Code's sandbox, and a sandboxed command can
+# write .env (decision 34). Only its first 64 KiB is read, since a hook that times out lets the
+# command run; a .env it cannot read leaves the trunk at main rather than ending the policy, which
+# would turn off every rule below.
 if [ -f "$PROJECT_DIR/.env" ]; then
-  set -a
-  # shellcheck disable=SC1091
-  . "$PROJECT_DIR/.env"
-  set +a
+  VALUE=$(head -c 65536 "$PROJECT_DIR/.env" 2>/dev/null | sed -n -E 's/^[[:space:]]*(export[[:space:]]+)?GIT_TRUNK=//p' | tail -n 1 | tr -d '\r') || VALUE=""
+  case "$VALUE" in
+    \"*) VALUE="${VALUE#\"}"; VALUE="${VALUE%%\"*}" ;;
+    \'*) VALUE="${VALUE#\'}"; VALUE="${VALUE%%\'*}" ;;
+    *) VALUE="${VALUE%%[[:space:]]*}" ;;
+  esac
+  if [ -n "$VALUE" ]; then GIT_TRUNK="$VALUE"; fi
 fi
 TRUNK="${GIT_TRUNK:-main}"
 

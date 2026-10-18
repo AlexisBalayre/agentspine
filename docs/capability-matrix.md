@@ -36,6 +36,13 @@ Two consequences the design absorbs:
   stdout, and stdout is reserved for that JSON. Its adapter translates, and keeps every other byte
   on stderr. This is exactly why policies never speak a host's protocol directly.
 
+**A Claude Code hook that fails or times out lets the call through.** A `PreToolUse` command hook
+that reaches its `timeout` is cancelled and does not block the tool call, and on most events a
+failing hook does not stop the action either. `"onFailure": "block"`, from 2.1.295, makes both
+block (https://code.claude.com/docs/en/hooks, "Timeouts" and "Block the action when a hook fails",
+read 2026-10-18). agentspine sets `timeout: 5` on git-safety and leaves `onFailure` unset, since its
+adapters fail open (decision 12).
+
 ## The two findings the design rests on
 
 1. **`SKILL.md` is a de facto standard.** All five follow the Anthropic Agent Skills spec: `name`
@@ -52,7 +59,7 @@ Neither holds for agents. See decision 8 in [`design/0001-architecture.md`](desi
 
 | | Memory | Skills | Hooks | Agents |
 | :-- | :-- | :-- | :-- | :-- |
-| **Claude Code** | `CLAUDE.md` -> `@AGENTS.md` | symlink | `settings.json`, deep-merged | rendered copy, plus Claude-only keys |
+| **Claude Code** | `CLAUDE.md` -> `@AGENTS.md` | symlink | `settings.json`, deep-merged, plus a sandbox write deny on `.agents/` | rendered copy, plus Claude-only keys |
 | **opencode** | native | nothing: native | JS plugin shim | symlink (v0.3) |
 | **Codex** | native | nothing: native | managed block in `config.toml` | none |
 | **Mistral Vibe** | native | nothing: native | managed block in `hooks.toml` | none |
@@ -85,8 +92,59 @@ only (`ext/skills/src/selection.rs:66-75`), so `$skill-name` still works. The fi
 is **warned about and ignored** (`ext/skills/src/loader/metadata.rs:117-140`), which silently
 restores implicit invocation. A test asserts the emitted payload for that reason.
 
+## Who can rewrite `.agents/` from a sandboxed command
+
+Read 2026-10-18. Hooks read their policies from `.agents/hooks/`, and the turn-end gate its
+commands from `.agents/quality.toml`; git-safety reads `GIT_TRUNK` from `.env`, as data. Where a
+hook runs outside the sandbox, a sandboxed command that can write `.agents/` chooses what the
+next hook runs with the user's full access (decision 34).
+
+| Tool | Where hooks run | `.agents/` from a sandboxed command |
+| :-- | :-- | :-- |
+| **Claude Code** | outside the sandbox, "with your full access" | writable by default; the emitted `settings.json` denies it |
+| **Codex** | outside the sandbox | read-only, protected by Codex itself |
+| **Cursor** | not documented | writable; `sandbox.json` has no key that denies it |
+| **opencode** | on the host | no sandbox: "OpenCode does **not** sandbox the agent" |
+| **Mistral Vibe** | on the host | no sandbox, outside an experimental mode |
+
+- **Claude Code** protects the `.claude` settings files and its `skills`, `agents`, `commands`
+  and `hooks` directories from sandboxed commands, but not `.agents/`, so `.claude/settings.json`
+  is protected and the policy scripts it names are not. `sandbox.filesystem.denyWrite` closes
+  that: `./` resolves from the project root in project settings, entries merge across settings
+  files, and a repository's deny entries still apply while the sandbox is admin-required. A
+  wildcard in `denyWrite` is skipped on Linux and WSL2, which is why the entry names one path. A
+  git command that must replace a file under it fails with `unable to unlink old`, and Claude
+  offers to rerun it outside the sandbox.
+- **A deny reaches the path a write resolves to, not the link it went through.** Seatbelt
+  "compares the kernel's canonical path" (sandbox-runtime `src/sandbox/sandbox-utils.ts:510`).
+  Probed with sandbox-runtime 0.0.80 on macOS: a deny on `.agents` refused `.agents/x`,
+  `.claude/skills/x` through the skills link, and renaming `.agents`, but let `.agents/hooks/x`
+  land where that `hooks` link points. A scaffolded `.agents/` holds real directories, so the
+  emitted entry covers all of it; this repository's `.agents/` links into `templates/agents/`,
+  which its own settings deny too. The docs follow a link from a protected path only for settings
+  files; the `.agents` deny covers the skills behind `.claude/skills` either way.
+- **Codex** names `.agents` among its protected metadata paths
+  (`codex-rs/protocol/src/permissions.rs:41`, `:46-51`), and makes a top-level `.agents`
+  directory in each writable root read-only, along with the gitdir a `.git` file points to
+  (`:2360-2402`). Hooks are spawned outside the sandbox
+  (`codex-rs/hooks/src/engine/command_runner.rs:244-251`, `build_command` at `:406-432`).
+- **Cursor's `sandbox.json`** takes `type`, `additionalReadwritePaths`, `additionalReadonlyPaths`
+  ("Extra paths the agent can read"), `readBoundary` and a few more, none of which denies a write
+  inside the workspace. It always protects the `.cursor` and `.claude` JSON files, `.vscode/`,
+  `.code-workspace`, `.git/hooks/`, `.git/config`, `.git/info/attributes` and `.cursorignore`, so
+  `.cursor/hooks.json` is protected and the policies it runs are not. Its hooks reference says
+  whether a shell command ran sandboxed, not where a hook runs.
+- **opencode:** `SECURITY.md:15-17`, "No Sandbox".
+- **Mistral Vibe** runs hooks as host subprocesses (`vibe/core/hooks/executor.py:44`). Its one
+  sandbox belongs to the experimental, hidden `--agent-socket` mode, where a server's sandbox
+  runs the file and shell tools and hooks stay on the host (`README.md`, "Sandboxed sessions").
+
 ## Known gaps
 
+- **Cursor cannot deny a sandboxed command writes to `.agents/`.** `sandbox.json` has no
+  deny-write key and its protected paths leave `.agents/` out, so a sandboxed command there can
+  rewrite a hook policy or `quality.toml`. See
+  [who can rewrite `.agents/`](#who-can-rewrite-agents-from-a-sandboxed-command).
 - **User-invoked skills are model-invocable on opencode and Mistral Vibe.** Their descriptions load
   into context and the model may fire them unprompted. Closed for Codex, which now gets
   `agents/openai.yaml` per user-invoked skill.
@@ -249,6 +307,23 @@ rows are honest about which claims are tested and which are read.
   - https://code.claude.com/docs/en/cli-reference (`--effort`, `--permission-mode`)
   - https://code.claude.com/docs/en/headless ("Turn off permission prompts in unattended runs")
   - https://code.claude.com/docs/en/agent-sdk/cost-tracking ("Break down usage per model")
+- Who can rewrite `.agents/`, all read 2026-10-18:
+  - Claude Code: https://code.claude.com/docs/en/sandboxing ("What runs outside the sandbox",
+    "Protected paths", "Repository settings under an admin-required sandbox", "A git command
+    fails with `unable to unlink old`"), https://code.claude.com/docs/en/settings-reference
+    ("Sandbox path prefixes", `sandbox.filesystem.denyWrite`); source
+    `anthropic-experimental/sandbox-runtime@626a596`, `src/sandbox/sandbox-utils.ts`
+  - The probe behind "A deny reaches the path a write resolves to": sandbox-runtime 0.0.80 (tag
+    `v0.0.80`, `626a596`) on macOS 26.6.2, 2026-10-18. A `denyWrite` on `.agents` refused a
+    sandboxed write under it and one through `.claude/skills`, and let one through a link out of
+    it
+  - Codex: source `openai/codex@8c07694`, `codex-rs/protocol/src/permissions.rs`,
+    `codex-rs/hooks/src/engine/command_runner.rs`
+  - Cursor: https://cursor.com/docs/reference/sandbox ("Protected paths"),
+    https://cursor.com/docs/hooks
+  - opencode: source `anomalyco/opencode@da9d436`, `SECURITY.md`
+  - Mistral Vibe: source `mistralai/mistral-vibe@4ae5c59`, `vibe/core/hooks/executor.py`,
+    `README.md` ("Sandboxed sessions")
 - Skill invocation control, all read 2026-09-17:
   - Claude Code — https://code.claude.com/docs/en/skills ("Control who invokes a skill")
   - Cursor — https://cursor.com/docs/context/skills
