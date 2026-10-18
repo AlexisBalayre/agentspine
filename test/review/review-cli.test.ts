@@ -305,15 +305,16 @@ describe("the workflow's config restore", () => {
     expect(git(dir, "status", "--porcelain", "--", ".claude-pr-agents")).toBe("");
   });
 
+  // `target` is relative to `outside`: "." links the directory itself.
   it.each([
-    ["the action's snapshot directory", ".claude-pr"],
-    ["the workflow's snapshot directory", ".claude-pr-agents"],
-    ["the snapshot of AGENTS.md", ".claude-pr-agents/AGENTS.md"],
-  ])("writes nothing through a link the PR commits at %s", (_label, link) => {
+    ["the action's snapshot directory", ".claude-pr", "."],
+    ["the workflow's snapshot directory", ".claude-pr-agents", "."],
+    ["the snapshot of AGENTS.md", ".claude-pr-agents/AGENTS.md", "victim.js"],
+  ])("writes nothing through a link the PR commits at %s", (_label, link, target) => {
     const { outside, result } = restoreRepo((dir, outside) => {
       writeFileSync(path.join(dir, "AGENTS.md"), "rewritten rules\n");
       mkdirSync(path.dirname(path.join(dir, link)), { recursive: true });
-      symlinkSync(link.endsWith(".md") ? path.join(outside, "victim.js") : outside, path.join(dir, link));
+      symlinkSync(path.join(outside, target), path.join(dir, link));
     });
     expect(result.status).toBe(0);
     expect(readdirSync(outside)).toEqual([]);
@@ -328,5 +329,17 @@ describe("the workflow's config restore", () => {
     expect(lstatSync(snapshot).isSymbolicLink()).toBe(true);
     expect(readlinkSync(snapshot)).toBe(path.join(outside, "victim.js"));
     expect(existsSync(path.join(outside, "victim.js"))).toBe(false);
+  });
+
+  // Without `--`, ln reads the target as an option and, given one operand, links that path's
+  // basename in the working directory, over the AGENTS.md just restored.
+  it("snapshots a link whose target reads as an option, and leaves the restored AGENTS.md alone", () => {
+    const { dir, result } = restoreRepo((dir) => {
+      mkdirSync(path.join(dir, ".agents/x"));
+      symlinkSync("-f", path.join(dir, ".agents/x/AGENTS.md"));
+    });
+    expect(result.status).toBe(0);
+    expect(readFileSync(path.join(dir, "AGENTS.md"), "utf8")).toBe("trusted rules\n");
+    expect(readlinkSync(path.join(dir, ".claude-pr-agents/.agents/x/AGENTS.md"))).toBe("-f");
   });
 });

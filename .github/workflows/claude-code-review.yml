@@ -209,8 +209,9 @@ jobs:
               read -r mode _ oid <<< "${entry%%$'\t'*}"
               dest=".claude-pr-agents/${entry#*$'\t'}"
               mkdir -p "$(dirname "$dest")"
+              # A gitlink (160000) names a commit, not a blob, so it has nothing to snapshot.
               case "$mode" in
-                120000) ln -s "$(git cat-file blob "$oid")" "$dest" ;;
+                120000) ln -s -- "$(git cat-file blob "$oid")" "$dest" ;;
                 100644 | 100755) git cat-file blob "$oid" > "$dest" ;;
               esac
             done < "${RUNNER_TEMP}/pr-snapshot"
