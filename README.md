@@ -94,7 +94,7 @@ npx agentspine --packs thinking,engineering
 | `thinking` | `grilling`, `grill-me`, `grill-with-docs`, `codebase-design`, `domain-modeling`, `improve-codebase-architecture`, `prototype`, `handoff`, `zoom-out`, `writing-for-agents`, `research`, `wait-what`, `to-questionnaire`, `caveman`, `retro` |
 | `engineering` | `tdd`, `diagnosing-bugs`, `wizard`, `find-dead-code` |
 | `planning` | `to-spec`, `to-tickets`, `wayfinder`, `implement`, `implement-spec`; installs `thinking`, `engineering` and `review` too, since it invokes their skills |
-| `review` | `review-changes` (six-area multi-agent review), `address-review-comments`, `pr-description`, and the seven reviewer subagents they dispatch |
+| `review` | `review-changes` (seven-area multi-agent review), `address-review-comments`, `pr-description`, and the eight reviewer subagents they dispatch |
 | `ci-review` | `pr-ci-review`, `review-retro`, and a GitHub Actions workflow that reviews every PR; installs `review` too. Claude Code only, and it needs setup: see below |
 
 They install once into `.agents/skills/`, where three of the five tools find them with no further
@@ -121,12 +121,19 @@ machine where the hooks run.
 ## Reviewing every pull request
 
 `--packs ci-review` emits `.github/workflows/claude-code-review.yml`: a deterministic preflight
-decides full versus incremental, Claude Code reviews the PR through the `review` pack's six
+decides full versus incremental, Claude Code reviews the PR through the `review` pack's seven
 reviewers, and a poster writes the verdict. **The model has no write access to the PR.** It emits a
 structured record; the poster renders it, anchors each important finding to a line in the diff, and
 pins a `claude-review` commit status. A run that dies, or that ends before every reviewer it
 spawned has reported, still posts "not reviewed" or "review incomplete" and fails the check,
 because green silence reads exactly like a clean review.
+
+The model's job holds a read-only token, and its tools are locked by managed settings that no file
+in the PR can widen: read-only `gh` and `git` verbs, no file edits, and a Bash sandbox that writes
+only to the checkout and Claude Code's temp directory and reaches no host but GitHub's API.
+Credentials are scrubbed from the shell it drives, except the job's read-only GitHub token, which
+`gh` needs. A verb the lock refuses lands in the run's record as a denied call rather than stalling
+the run.
 
 The workflow's deterministic steps are `agentspine review preflight|schema|post|metrics`, installed
 from npm at the version that scaffolded the file, so the repository gets a workflow and no
@@ -141,8 +148,29 @@ review, whether by opening a PR or by commenting `@claude review`. GitHub record
 association without a permission level, so a read-only collaborator counts. A push to a PR only
 triggers a review when the PR's author pushed it.
 
+**Asking by comment.** `@claude review` on a PR runs the review on demand, and the words right
+after it on the same line, in any order, shape it. The first word that is not one of them ends
+the request, so `@claude review, thanks` is a plain review.
+
+| Comment | Review |
+| :------ | :----- |
+| `@claude review` | the changes since the last complete review; the whole PR when there is none, when it reviewed this same head, or after a rebase or a merge from the base |
+| `@claude review full` | the whole PR diff |
+| `@claude review quick` | correctness, plus security when a trust boundary is touched, one instance each |
+| `@claude review deep` | every area, gate or not (`spec` still needs an issue the PR closes); one more instance of each size-scaled area (up to 3); maintainability on Opus; the orchestrator at high effort |
+| `@claude review security docs` | only the named areas (`correctness`, `security`, `context`, `conventions`, `maintainability`, `docs`), plus `spec` when the PR closes an issue |
+
+A quick or area-restricted review is partial: the next review diffs from the last complete one,
+so what it skipped is covered then; comment `@claude review` for a complete pass now. The review
+adds its verdict to the comment as a reaction when it ends: 🚀 (no important findings), 👍 (no
+important findings from a partial review, whose `claude-review` status also says "partial
+review"), 👎 (important findings posted), or 😕 (not reviewed: the run failed or was cancelled).
+A comment on a PR that closed before the review started gets no reaction, and neither does a
+request displaced from the queue by a later push, which never starts; comment again. If the
+Claude GitHub app is installed it also reacts 👀 to any `@claude` mention on its own.
+
 GitHub and Claude Code only, because it runs through `anthropics/claude-code-action`. On any other
-host, `review-changes` reviews the same six areas locally.
+host, `review-changes` reviews the same seven areas locally.
 
 ## Install safety
 

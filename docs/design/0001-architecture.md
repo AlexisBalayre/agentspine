@@ -473,6 +473,10 @@ and builds its verdict from an artifact: a review talked into writing to the PR 
 could. The cost is a second checkout and tooling install per run, and a hand-off contract, since
 the structured output crosses as a file once a findings record outgrows a job output.
 
+- **Amended in decision 31:** the token contains what reaches GitHub, not what the model can run
+  on the runner. Managed settings, a Bash sandbox and a credential scrub now hold that, and
+  `Bash(gh api repos/*)` is gone from the review.
+
 **Reviewer model tiers are set at spawn time, not in frontmatter** (effort cannot be, see decision
 28)**.** Decision 8 strips `model:` from
 shipped agents because the key is not portable. Left there, `correctness` and `security` would
@@ -778,8 +782,8 @@ runs `review-changes` locally instead and fixes that review's important findings
 - **Cost accepted:** `--packs planning` now also installs `review`, and with it `.agents/agents/`
   and the seven reviewer agents on the hosts that take them.
 
-**Not taken in here:** the template's worktree-removal script and its review-pipeline changes.
-Each is its own port.
+**Not taken in here:** the template's worktree-removal script (decision 30) and its
+review-pipeline changes (decision 31). Each is its own port.
 
 ## 30. Removing a worktree without losing its branch
 
@@ -816,3 +820,89 @@ origin's branch from inside the stubbed `gh` lookup, which runs between the fetc
   costs a `git branch -D` and loses nothing.
 - **Cost accepted:** three worktree scripts where two used to cover the job. The `AGENTS.md`
   bullet now says clean force-removes, so the difference is visible where an agent picks one.
+
+## 31. Tracking the October 2026 template's review pipeline
+
+Date: 2026-10-18
+
+The template's review changes since decision 28 come in, adapted to agentspine's three-job
+workflow and global tooling install:
+
+- `@claude review` reads `full`, a depth (`quick`, `deep`) and reviewer areas from the comment. A
+  quick or area-restricted round is **partial**: the preflight never takes one as the prior, so
+  the next round covers what it skipped, and its status says "partial review".
+- The poster hands back a reaction for the comment (🚀, 👍 when partial, 👎, 😕), and the workflow
+  clears its earlier ones.
+- A `review-spec` reviewer holds the change against the issue it closes. Its findings never carry
+  a suggestion and are never auto-fixed, because issue text on a public repository is anyone's.
+- The metrics record splits spend by model, records the request and the denied tool calls.
+- The model's permissions are locked in managed settings, Bash runs in a sandbox, and credentials
+  are scrubbed from its shell.
+- Every hand-off file moves under the runner's temp.
+- CI reviewers are told the review is static and the checkout carries no project dependencies.
+
+**Decision 21's containment was half the story.** "The containment is the token" holds for what
+reaches GitHub: the model's job still holds a read-only token, and the poster's job holds the
+write scopes. It did not hold for the runner. The allowlist admitted `git grep`, whose `-O` runs a
+command, and `git diff*`, which matches `git difftool`, which runs one too. The skill's own
+`allowed-tools` (`Bash(git *)`, `Bash(gh *)`) widened it further while the skill ran. All of that
+sat on a runner whose environment carried the Claude OAuth token. Now:
+
+- `allowManagedPermissionRulesOnly` makes the managed rules the only ones that count.
+- The verbs are the read-only ones the protocol names.
+- The sandbox refuses writes outside the checkout and Claude Code's per-user temp directory, and any
+  host but `api.github.com`, and fails the run rather than start without itself.
+- The scrub keeps credentials out of anything the model could print into the record.
+
+`Bash(gh api repos/*)`, which decision 21 kept because the orchestrator read comment threads
+through it, goes: gh bundles short flags (`-if body=x` is a POST), so no deny rule can hold it
+read-only. The orchestrator reads steering from `gh pr view --json reviews,comments` instead.
+
+**The hand-off files had a hole of their own.** Both jobs check out the PR head, and the files
+lived in the checkout. A fork could commit `posted.json` as a symlink the poster's write would
+follow. Worse, it could commit a `review-output/structured-output.json` of its choosing, which
+the poster would read as the review's verdict whenever the review died before uploading its own.
+Every hand-off path is now under `runner.temp`, and a test asserts none is relative.
+
+Adapted, not copied:
+
+- **The reaction is posted by the poster job**, which gains `issues: write`. The model's job keeps
+  a read-only token, so it cannot react. The template's single job reacts even when the PR closed
+  before the review started; here `post-review` is skipped with the review, so that comment gets
+  no reaction.
+- **No 👀 of agentspine's own.** The template dropped its acknowledgement because the Claude GitHub
+  app reacts to any `@claude` mention. agentspine passes the workflow token and never needs the
+  app, so that 👀 is there only when a repository installed it. An acknowledgement here would need
+  a write token before the review starts, which is a fourth job spent on feedback.
+- **`schema_version` 3 is agentspine's numbering.** The template spread these fields over its
+  versions 3 to 6. agentspine never shipped those intermediate shapes, so one bump covers them, and
+  `review-retro` documents agentspine's numbers.
+- **`review-changes` gets `review-spec` too.** The agent ships in the `review` pack, and without a
+  roster row there it would only run under the Claude-only CI path.
+
+Not taken:
+
+- **Template #16** scopes the template's `.claude/rules` loaders. agentspine emits no
+  `.claude/rules`.
+- **Template #27**, the planted-regression recall eval. Its cases replay the template's own PRs, so
+  it measures that repository's pipeline, not the one agentspine emits.
+- **Template #28** runs the review tooling from its own directory, because node and tsx read the
+  working directory's `package.json` and `tsconfig.json`, and from the PR checkout those are the
+  PR's. agentspine's tooling is a global npm install run by its own path, and this repository's
+  dogfood builds it into a base-branch worktree under `RUNNER_TEMP` (decision 26), so neither
+  reads the checkout's files. The template's pre-checkout copy of the tooling is unnecessary for
+  the same reason.
+
+Costs accepted:
+
+- **Two permission lists to keep in step.** The skill's `allowed-tools` serve a local run; the
+  workflow's managed settings serve CI and ignore the former. A verb the skill starts using under
+  CI must be added to the lock, or it is refused. A refusal is not silent: it lands in the record's
+  `permission_denials`, which `review-retro` reads.
+- **Every round installs bubblewrap and socat** and relaxes Ubuntu's AppArmor restriction on
+  unprivileged user namespaces, on a runner that is discarded afterwards.
+- **Inline review threads and their resolution are out of the orchestrator's reach under CI.**
+  `gh pr view --json reviews,comments` returns reviews and conversation comments, not thread state.
+- **A comment on a closed PR gets no verdict reaction**, as above.
+
+The Claude Code facts the lock rests on are recorded in the capability matrix, read 2026-10-18.

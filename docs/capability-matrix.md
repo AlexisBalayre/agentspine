@@ -146,6 +146,40 @@ copy and not the shared files (decision 28).
   in the same repository gets Claude's copies, `effort` key included, and Cursor does not
   document what it does with a key it does not know.
 
+## The CI review's lock (Claude Code)
+
+Read 2026-10-18, from Claude Code's documentation. The emitted review workflow writes these into
+`/etc/claude-code/managed-settings.json`, the managed settings path on Linux (decision 31). The run
+uses the Claude Code that `claude-code-action` v1.0.237 bundles, 2.1.285 (its
+`@anthropic-ai/claude-agent-sdk` 0.3.285, whose `claudeCodeVersion` is 2.1.285).
+
+| Setting or fact | What the docs say it does |
+| :-- | :-- |
+| `allowManagedPermissionRulesOnly` | ignores `allow`, `ask` and `deny` rules from user, project, local and `--settings` files, and `--allowedTools`; from 2.1.282, also skills' `allowed-tools` |
+| `permissions.defaultMode: "dontAsk"` | denies every call that would otherwise prompt; reads in the working directory and allowed tools still run |
+| `--permission-mode` | overrides `defaultMode`, which is why `deny` holds the file tools rather than the mode |
+| `disableAutoMode`, `permissions.disableBypassPermissionsMode` | `"disable"` turns each mode off; accepted in any settings file, not only managed ones |
+| `Bash(git diff *)` | the space before `*` stops it matching `git diff-index`; a `*` matches any text, spaces included, so `Bash(git diff*)` also matches `git difftool` |
+| `sandbox.enabled`, `failIfUnavailable`, `allowUnsandboxedCommands`, `autoAllowBashIfSandboxed` | Bash in a sandbox; exit at startup if it cannot start; no retry outside it; no auto-approval for sandboxed calls |
+| `sandbox.network.allowedDomains`, `allowManagedDomainsOnly` | outbound hosts for sandboxed commands, locked to the managed list |
+| Sandbox filesystem | writes only to the working directory and the per-user temp directory `$TMPDIR` points to, by default; reads are not restricted |
+| Linux sandbox | needs `bubblewrap` and `socat`, which the workflow installs |
+| `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` | strips credentials, recognised by variable name or value shape, from the environments of the subprocesses Claude Code starts, Bash among them; leaves `GH_TOKEN` and `GITHUB_TOKEN` so `gh` keeps working |
+| `--effort` | `low`, `medium`, `high`, `xhigh`, `max`; available levels depend on the model |
+| Result message | `permission_denials` (`tool_name`, `tool_input`); `modelUsage` per model, subagents included; `usage` covers the main loop only |
+
+- **`$TMPDIR` on the runner is not `RUNNER_TEMP`,** which holds `$GITHUB_ENV`: GitHub's runner sets
+  `RUNNER_TEMP` and never `TMPDIR` (a search of `actions/runner` finds `TMPDIR` only in a vendored
+  `dotnet-install.sh`, 2026-10-18). Were it set there, the sandbox would let a review write the
+  job's environment file.
+- **The Claude OAuth token is not named** in the scrub's documented list. The docs say only that
+  "the Claude Code process keeps the credentials for its own API calls", and the token's name fits
+  the credential-name rule. The emitted comment does not claim it by name.
+- **Not documented, and not relied on:** that the scrub changes the permission mode. The
+  template this pipeline is ported from says it forces default mode. The emitted comment says only
+  that a run in any mode refuses an unlisted verb, since `dontAsk` denies it and a run in any other
+  mode has nobody to answer the prompt.
+
 ## Verified against
 
 | Tool | Version checked | Date | How |
@@ -177,6 +211,16 @@ rows are honest about which claims are tested and which are read.
   - Cursor — https://cursor.com/docs/context/subagents
 - Session transcripts, read 2026-10-18: Claude Code — https://code.claude.com/docs/en/hooks
   (`transcript_path` in the common input fields)
+- The CI review's lock, all read 2026-10-18:
+  - https://code.claude.com/docs/en/managed-settings ("Deploy a managed settings file", "Keys only
+    a managed source can set")
+  - https://code.claude.com/docs/en/settings-reference ("Permission settings", "Sandbox settings")
+  - https://code.claude.com/docs/en/permissions ("Permission modes", "Wildcard patterns")
+  - https://code.claude.com/docs/en/sandboxing ("Filesystem isolation", "Set up Linux and WSL2")
+  - https://code.claude.com/docs/en/env-vars ("What the subprocess environment scrub removes")
+  - https://code.claude.com/docs/en/cli-reference (`--effort`, `--permission-mode`)
+  - https://code.claude.com/docs/en/headless ("Turn off permission prompts in unattended runs")
+  - https://code.claude.com/docs/en/agent-sdk/cost-tracking ("Break down usage per model")
 - Skill invocation control, all read 2026-09-17:
   - Claude Code — https://code.claude.com/docs/en/skills ("Control who invokes a skill")
   - Cursor — https://cursor.com/docs/context/skills
